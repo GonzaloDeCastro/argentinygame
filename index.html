@@ -1,0 +1,2225 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Batallas Argentinas - San Lorenzo, 1813</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; background: radial-gradient(ellipse at 50% 25%, #3b2b1c, #120c08 72%); color:#f1e6c8; font-family: Georgia, "Times New Roman", serif; display:flex; justify-content:center; padding:16px; }
+  #wrap { display:flex; gap:12px; align-items:flex-start; flex-wrap:wrap; justify-content:center; }
+  #stage { position:relative; }
+  canvas { display:block; border:4px solid #6b4a2b; background:#000; cursor:pointer; }
+  #c { width: clamp(640px, calc(100vw - 420px), 960px); height: auto; aspect-ratio: 640 / 440; border-color: #a8844a; box-shadow: 0 8px 28px rgba(0,0,0,.55); }
+  aside { width:330px; background:linear-gradient(180deg,#36281b,#241a12); border:4px solid #a8844a; box-shadow: inset 0 0 0 2px #2a1e15, inset 0 0 0 3px #6b4a2b, 0 8px 28px rgba(0,0,0,.55); padding:14px; }
+  h2 { margin:0 0 6px; font-size:13px; color:#e8c872; letter-spacing:3px; border-bottom:1px solid #6b4a2b; padding-bottom:3px; }
+  #turn { font-size:19px; margin-bottom:10px; color:#ffe9a8; text-shadow:0 1px 2px #000; font-weight:bold; }
+  .panel { background:#1b1410; border:1px solid #4a3522; padding:8px; margin-bottom:10px; min-height:96px; font-size:14px; line-height:1.5; }
+  #log { height:150px; overflow-y:auto; font-size:13px; line-height:1.4; }
+  #log div { margin-bottom:3px; }
+  button { background:linear-gradient(180deg,#a8702f,#7a4a1e); color:#fff3d6; border:2px solid #e8c872; text-shadow:0 1px 1px #000; border-radius:3px; padding:8px 14px; font-family:inherit; font-size:15px; cursor:pointer; width:100%; margin-bottom:6px; }
+  button:hover { background:linear-gradient(180deg,#c28540,#8a5a2b); }
+  button:disabled { opacity:.45; cursor:default; }
+  #snd { background:linear-gradient(180deg,#46341f,#32241a); font-size:13px; padding:5px 10px; }
+  .bar { display:inline-block; height:8px; background:#a33; width:90px; vertical-align:middle; }
+  .bar i { display:block; height:100%; background:#4c4; }
+  #overlay { position:fixed; inset:0; background:rgba(10,6,3,.88); display:flex; align-items:center; justify-content:center; z-index:10; padding:16px; }
+  #overlay.hidden { display:none; }
+  .box { max-height:92vh; overflow-y:auto; max-width:580px; background:#2a1e15; border:4px solid #e8c872; padding:24px 28px; text-align:center; }
+  .box h1 { margin:0 0 4px; color:#e8c872; font-size:26px; }
+  .box h3 { margin:0 0 14px; color:#b9a77a; font-weight:normal; font-style:italic; }
+  .box p { text-align:left; line-height:1.55; font-size:15px; margin:8px 0; }
+  .help { font-size:12px; color:#b9a77a; }
+  #faceRow { display:flex; gap:10px; align-items:flex-start; margin-bottom:10px; }
+  #face { width:96px; height:96px; border:3px solid #e8c872; background:#1b1410; flex:none; }
+  #faceRow .panel { margin:0; flex:1; min-height:96px; font-size:13px; line-height:1.4; }
+  .diff { margin:12px 0 6px; font-size:14px; }
+  .dbtn { width:auto; display:inline-block; margin:0 4px; padding:5px 14px; font-size:14px; }
+  .dbtn.sel { background:linear-gradient(180deg,#3f8a4a,#2a6a34); border-color:#fff3d6; }
+  #helpOv { position:fixed; inset:0; background:rgba(10,6,3,.9); display:flex; align-items:center; justify-content:center; z-index:20; padding:16px; }
+  #helpOv.hidden { display:none; }
+  .helpbox { max-width:780px; max-height:92vh; overflow:auto; text-align:left; }
+  .helpbox h1, .helpbox h3 { text-align:center; }
+  .helpbox h2 { font-size:15px; color:#e8c872; letter-spacing:2px; border-bottom:1px solid #6b4a2b; padding-bottom:3px; margin:16px 0 6px; }
+  .helpbox ul, .helpbox ol { margin:4px 0; padding-left:22px; line-height:1.5; font-size:14px; }
+  .helpbox li { margin-bottom:4px; }
+  .helpbox p { font-size:14px; }
+  .bcard { text-align:left; padding:10px 14px; margin-bottom:10px; font-size:16px; }
+  .bcard span { font-size:13px; font-weight:normal; color:#f1dfb0; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="stage"><canvas id="c" width="1280" height="880"></canvas></div>
+  <aside>
+    <div id="turn">Turno 1</div>
+    <h2>UNIDAD</h2>
+    <div id="faceRow"><canvas id="face" width="192" height="192"></canvas><div class="panel" id="info">Pasa el mouse sobre una unidad.</div></div>
+    <h2>REGISTRO</h2>
+    <div class="panel" id="log"></div>
+    <button id="endTurn">Terminar turno</button>
+    <button id="snd">Sonido: apagado</button>
+    <button id="threatBtn">Amenaza enemiga: oculta (T)</button>
+    <button id="helpBtn">Instructivo (H)</button>
+    <div class="help">Clic en una unidad azul y luego en una casilla para moverla. Despues elige Atacar o Esperar, el arma, y pasa el mouse sobre un enemigo para ver el pronostico. Clic fuera del menu o clic derecho/Esc: volver atras. En un combate, un clic lo acelera.</div>
+  </aside>
+</div>
+<div id="overlay"><div class="box" id="box"></div></div>
+<div id="helpOv" class="hidden"><div class="box helpbox"><div id="helpBody"></div><button id="helpClose">Cerrar</button></div></div>
+
+<script>
+"use strict";
+// ================= DATOS =================
+const TS = 40, W = 16, H = 11;
+let MAP = [
+  "..TT.......T..~~",
+  ".TT.........T.~~",
+  "....T.........T~",
+  ".CC.....T......~",
+  ".CC..T.........~",
+  "......T....TT..~",
+  ".CC.....T......~",
+  ".CC............~",
+  "...T.....T....T~",
+  ".TT.....T.....~~",
+  "..T......T....~~"
+];
+// def = defensa extra, avoid = esquive extra (como en Fire Emblem: el bosque da +1 def y +20 esquive)
+const TERRAIN = {
+  ".": { name: "Llanura",         cost: {cav:1, inf:1, art:1}, def: 0, avoid: 0 },
+  "T": { name: "Monte",           cost: {cav:3, inf:2, art:3}, def: 1, avoid: 20 },
+  "C": { name: "Edificio (muro)", cost: null, def: 0, avoid: 0 },
+  "~": { name: "Agua", cost: null, def: 0, avoid: 0 },
+  "S": { name: "Sembrado", cost: {cav:2, inf:1, art:2}, def: 0, avoid: 10 }
+};
+const CLASSES = {
+  cav: { label: "Caballeria", mov: 5 },
+  inf: { label: "Infanteria", mov: 3 },
+  art: { label: "Artilleria", mov: 2 }
+};
+// Armas: mt = poder, hit = punteria, crit = critico, wt = peso, rmin/rmax = alcance, uses = durabilidad
+const WEAPONS = {
+  sable:    { name: "Sable",       type: "sword",  mt: 5,  hit: 90, crit: 0, wt: 5,  rmin: 1, rmax: 1, uses: 40 },
+  corvo:    { name: "Sable corvo", type: "sword",  mt: 7,  hit: 85, crit: 8, wt: 7,  rmin: 1, rmax: 1, uses: 35 },
+  carabina: { name: "Carabina",    type: "gun",    mt: 5,  hit: 75, crit: 0, wt: 5,  rmin: 2, rmax: 2, uses: 20 },
+  bayoneta: { name: "Bayoneta",    type: "lance",  mt: 6,  hit: 80, crit: 0, wt: 7,  rmin: 1, rmax: 1, uses: 40 },
+  fusil:    { name: "Fusil",       type: "gun",    mt: 6,  hit: 75, crit: 0, wt: 8,  rmin: 2, rmax: 2, uses: 20 },
+  machete:  { name: "Machete",     type: "axe",    mt: 7,  hit: 75, crit: 0, wt: 9,  rmin: 1, rmax: 1, uses: 35 },
+  canon:    { name: "Cañón", type: "cannon", mt: 10, hit: 70, crit: 0, wt: 14, rmin: 2, rmax: 3, uses: 15 }
+};
+// Triangulo de armas (como Fire Emblem): espada > hacha > lanza > espada. Armas de fuego y canon: sin triangulo.
+const TRI = { sword: "axe", axe: "lance", lance: "sword" };
+
+// st = [PV, Fuerza, Habilidad, Velocidad, Defensa, Suerte, Constitucion]
+function mk(id, name, team, cls, x, y, st, wps, extra) {
+  return Object.assign({
+    id, name, team, cls, x, y, hp: st[0], maxhp: st[0], str: st[1], skl: st[2], spd: st[3], def: st[4], lck: st[5], con: st[6],
+    weapons: wps.map(k => Object.assign({}, WEAPONS[k])), acted: false, leader: false, flash: 0
+  }, extra || {});
+}
+function baseUnits() {
+  return [
+    mk(1, "Gral. San Martin", "p", "cav", 3, 5, [26, 8, 9, 10, 5, 7, 10], ["corvo", "carabina"], { leader: true }),
+    mk(2, "Cap. Bermudez",    "p", "cav", 3, 2, [23, 7, 7, 9, 4, 5, 9],   ["sable", "carabina"]),
+    mk(3, "Cap. Escalada",    "p", "cav", 2, 8, [22, 6, 8, 10, 3, 6, 8],  ["sable", "carabina"]),
+    mk(4, "Sgto. Cabral",     "p", "cav", 4, 6, [24, 8, 6, 7, 4, 3, 10],  ["sable", "carabina"]),
+    mk(5, "Granadero",        "p", "cav", 3, 3, [20, 6, 5, 8, 3, 3, 9],   ["sable", "carabina"]),
+    mk(6, "Granadero",        "p", "cav", 3, 7, [20, 6, 5, 8, 3, 3, 9],   ["sable", "carabina"]),
+    mk(7, "Granadero",        "p", "cav", 4, 4, [20, 6, 5, 8, 3, 3, 9],   ["sable", "carabina"]),
+    mk(11, "Infante realista", "e", "inf", 10, 3, [20, 6, 4, 6, 3, 2, 8], ["bayoneta", "fusil"]),
+    mk(12, "Infante realista", "e", "inf", 10, 5, [20, 6, 4, 6, 3, 2, 8], ["machete", "fusil"]),
+    mk(13, "Infante realista", "e", "inf", 10, 7, [20, 6, 4, 6, 3, 2, 8], ["bayoneta", "fusil"]),
+    mk(14, "Infante realista", "e", "inf", 9, 4,  [20, 6, 4, 6, 3, 2, 8], ["machete", "fusil"]),
+    mk(18, "Infante realista", "e", "inf", 11, 3, [20, 6, 4, 6, 3, 2, 8], ["bayoneta", "fusil"]),
+    mk(19, "Infante realista", "e", "inf", 11, 7, [20, 6, 4, 6, 3, 2, 8], ["machete", "fusil"]),
+    mk(15, "Canon realista",   "e", "art", 12, 4, [14, 5, 3, 3, 1, 1, 12], ["canon"]),
+    mk(16, "Canon realista",   "e", "art", 12, 6, [14, 5, 3, 3, 1, 1, 12], ["canon"]),
+    mk(17, "Cmdte. Zabala",    "e", "inf", 13, 5, [26, 7, 7, 7, 5, 5, 10], ["bayoneta", "fusil"], { leader: true })
+  ];
+}
+
+// ================= ESTADO =================
+let units, turn, state, selected, origin, moveMap, targets, options = [], selW = null;
+let hover = {x:-1,y:-1}, busy = false, scene = null, fastMode = false, skipScene = false, menuRects = [], faceShown = null, mouse = {x:-1,y:-1};
+const cv = document.getElementById("c"), ctx = cv.getContext("2d");
+const $info = document.getElementById("info"), $log = document.getElementById("log"), $turn = document.getElementById("turn");
+const fcv = document.getElementById("face"), fctx = fcv.getContext("2d"); fctx.scale(2, 2);
+const $end = document.getElementById("endTurn"), $overlay = document.getElementById("overlay"), $box = document.getElementById("box"), $snd = document.getElementById("snd");
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const alive = () => units.filter(u => u.hp > 0);
+const unitAt = (x, y) => alive().find(u => u.x === x && u.y === y);
+const inMap = (x, y) => x >= 0 && y >= 0 && x < W && y < H;
+const tile = (x, y) => TERRAIN[MAP[y][x]];
+const dist = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+function log(t, col) { const d = document.createElement("div"); d.textContent = t; if (col) d.style.color = col; $log.appendChild(d); $log.scrollTop = $log.scrollHeight; }
+
+// ================= LOGICA DE MOVIMIENTO =================
+function reachable(u) {
+  const best = new Map([[u.x + "," + u.y, 0]]);
+  const open = [{ x: u.x, y: u.y, c: 0 }];
+  while (open.length) {
+    open.sort((a, b) => a.c - b.c);
+    const cur = open.shift();
+    if (cur.c > best.get(cur.x + "," + cur.y)) continue;
+    for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+      const nx = cur.x + dx, ny = cur.y + dy;
+      if (!inMap(nx, ny)) continue;
+      const cost = tile(nx, ny).cost && tile(nx, ny).cost[u.cls];
+      if (cost == null) continue;
+      const other = unitAt(nx, ny);
+      if (other && other.team !== u.team) continue;
+      const nc = cur.c + cost;
+      if (nc > movOf(u)) continue;
+      const k = nx + "," + ny;
+      if (best.has(k) && best.get(k) <= nc) continue;
+      best.set(k, nc);
+      open.push({ x: nx, y: ny, c: nc });
+    }
+  }
+  const res = new Map();
+  for (const [k, c] of best) {
+    const [x, y] = k.split(",").map(Number);
+    const o = unitAt(x, y);
+    if (!o || o === u) res.set(k, c);
+  }
+  return res;
+}
+
+// ================= LOGICA DE COMBATE (reglas de Fire Emblem GBA) =================
+const usable = u => u.weapons.filter(w => w.uses > 0);
+function enemiesInRange(u, x, y, w) {
+  return alive().filter(t => t.team !== u.team && Math.abs(t.x - x) + Math.abs(t.y - y) >= w.rmin && Math.abs(t.x - x) + Math.abs(t.y - y) <= w.rmax);
+}
+function availableWeapons(u) { return usable(u).filter(w => enemiesInRange(u, u.x, u.y, w).length > 0); }
+function counterWeapon(u, r) { return usable(u).find(w => r >= w.rmin && r <= w.rmax) || null; }   // el defensor usa su primera arma con alcance
+function triBonus(w, o) { if (!w || !o) return 0; if (TRI[w.type] === o.type) return 1; if (TRI[o.type] === w.type) return -1; return 0; }
+function AS(u, w) { return u.spd - Math.max(0, (w ? w.wt : 0) - u.con); }                          // velocidad de ataque
+function sideStats(u, w, f, fw) {
+  const t = triBonus(w, fw), ter = tile(f.x, f.y);
+  const mt = Math.max(0, u.str + w.mt + t - f.def - ter.def);
+  const fAS = AS(f, fw || usable(f)[0] || null);
+  const hit = clamp(w.hit + u.skl * 2 + Math.floor(u.lck / 2) + t * 15 - (fAS * 2 + f.lck + ter.avoid) - (u.team === "e" && locustActive ? 15 : 0), 0, 100);
+  const crit = clamp(w.crit + Math.floor(u.skl / 2) - f.lck, 0, 100);
+  return { u, w, mt, hit, crit, tri: t, as: AS(u, w), times: 1 };
+}
+function preview(a, wa, d) {
+  const r = dist(a, d), wd = counterWeapon(d, r);
+  const A = sideStats(a, wa, d, wd), D = wd ? sideStats(d, wd, a, wa) : null;
+  const asD = D ? D.as : AS(d, usable(d)[0] || null);
+  if (A.as - asD >= 4) A.times = 2;                                  // ataque doble: 4 o mas de velocidad
+  if (D && D.as - A.as >= 4) D.times = 2;
+  const seq = [A]; if (D) seq.push(D); if (A.times === 2) seq.push(A); if (D && D.times === 2) seq.push(D);
+  return { A, D, seq };
+}
+const rn = () => Math.floor(Math.random() * 100);
+const rollHit = p => (rn() + rn()) / 2 < p;                           // "2RN": promedio de dos tiradas, como FE7/FE8
+function equip(u, w) { u.weapons = [w, ...u.weapons.filter(x => x !== w)]; }
+
+async function fight(a, wa, d) {
+  if (!fastMode) await duelTalk(a, d);
+  const pv = preview(a, wa, d);
+  equip(a, wa); if (pv.D) equip(d, pv.D.w);
+  if (!fastMode) { await openScene(a, d, pv); await shoutsAt(a, d); }
+  for (const s of pv.seq) {
+    if (a.hp <= 0 || d.hp <= 0) break;
+    const tgt = s.u === a ? d : a;
+    const hit = rollHit(s.hit), crit = hit && rn() < s.crit;
+    const dmg = hit ? s.mt * (crit ? 3 : 1) : 0;
+    s.w.uses--;
+    await strike(s, tgt, hit, crit, dmg);
+    if (hit && s.w.effect === "slow" && tgt.hp > 0) { tgt.slowUntil = turn; log(tgt.name + " queda enredado (-2 de movimiento).", "#ffd84a"); }
+  }
+  for (const u of [a, d]) {
+    for (const w of u.weapons) if (w.uses <= 0) log(u.name + ": se rompio " + w.name + ".");
+    u.weapons = u.weapons.filter(w => w.uses > 0);
+  }
+  if (!fastMode) await closeScene();
+}
+function checkEnd() {
+  const p = alive().filter(u => u.team === "p"), e = alive().filter(u => u.team === "e");
+  const leadDead = !units.find(u => u.id === B.leaderId).hp;
+  if (leadDead) { showEnd(false, B.leaderFall); return true; }
+  if (!p.length) { showEnd(false, "Tu ejército fue derrotado."); return true; }
+  if (!e.length) { showEnd(true); return true; }
+  return false;
+}
+
+// ================= TURNOS =================
+function startPlayerTurn() {
+  units.forEach(u => u.acted = false);
+  state = "select"; selected = null; moveMap = null; targets = null; busy = false;
+  $turn.textContent = "Turno " + turn + " - " + B.pName;
+  $end.disabled = false;
+  showBanner(B.pBanner, "rgba(36,84,168,.92)");
+  log("-- Turno " + turn + ": " + B.pName + " --");
+  runTurnEvent();
+}
+function finishUnit(u) {
+  u.acted = true; selected = null; moveMap = null; targets = null; state = "select";
+  if (checkEnd()) return;
+  if (alive().filter(x => x.team === "p").every(x => x.acted)) endPlayerTurn();
+}
+async function endPlayerTurn() {
+  if (busy || state === "over") return;
+  busy = true; state = "enemy"; selected = null; moveMap = null; targets = null;
+  $end.disabled = true;
+  $turn.textContent = "Turno " + turn + " - Realistas";
+  log("-- Turno " + turn + ": avanzan los Realistas --");
+  showBanner("FASE REALISTA", "rgba(168,40,28,.92)");
+  await sleep(fastMode ? 0 : 1300);
+  for (const u of alive().filter(x => x.team === "e")) {
+    if (u.hp <= 0) continue;
+    await enemyAct(u);
+    await midEvent();
+    if (checkEnd()) return;
+  }
+  turn++;
+  startPlayerTurn();
+}
+async function enemyAct(u) {
+  const reach = reachable(u), saved = { x: u.x, y: u.y };
+  let best = null;
+  for (const [k] of reach) {
+    const [x, y] = k.split(",").map(Number);
+    u.x = x; u.y = y;
+    for (const w of usable(u)) for (const t of enemiesInRange(u, x, y, w)) {
+      const pv = preview(u, w, t);
+      const exp = pv.A.hit / 100 * pv.A.mt * pv.A.times;
+      const expC = pv.D ? pv.D.hit / 100 * pv.D.mt * pv.D.times : 0;
+      const score = exp + (exp >= t.hp ? 40 : 0) + (t.leader ? 8 : 0) - expC * 0.7 + tile(x, y).avoid / 10;
+      if (!best || score > best.score) best = { x, y, w, t, score };
+    }
+  }
+  u.x = saved.x; u.y = saved.y;
+  if (best) {
+    u.x = best.x; u.y = best.y;
+    await sleep(350);
+    await fight(u, best.w, best.t);
+    return;
+  }
+  const foes = alive().filter(t => t.team !== u.team);
+  let bestTile = null, bestD = Infinity;
+  for (const [k] of reach) {
+    const [x, y] = k.split(",").map(Number);
+    const d = Math.min(...foes.map(f => Math.abs(f.x - x) + Math.abs(f.y - y)));
+    if (d < bestD) { bestD = d; bestTile = { x, y }; }
+  }
+  if (bestTile && (bestTile.x !== u.x || bestTile.y !== u.y)) { u.x = bestTile.x; u.y = bestTile.y; await sleep(300); }
+}
+
+// ================= ENTRADA =================
+function cellFromEvent(e) {
+  const r = cv.getBoundingClientRect();
+  return { x: Math.floor((e.clientX - r.left) * (640 / r.width) / TS), y: Math.floor((e.clientY - r.top) * (440 / r.height) / TS) };
+}
+function pixelFromEvent(e) {
+  const r = cv.getBoundingClientRect();
+  return { x: (e.clientX - r.left) * 640 / r.width, y: (e.clientY - r.top) * 440 / r.height };
+}
+function deselect() {                       // cancela la unidad elegida y la devuelve a su sitio
+  if (selected && origin) { selected.x = origin.x; selected.y = origin.y; }
+  selected = null; moveMap = null; targets = null; selW = null; state = "select";
+}
+function backFromTarget() { targets = null; selW = null; state = options.length > 1 ? "weapon" : "menu"; }
+function cancel() {
+  if (busy || state === "over" || scene || dlg) return;
+  Snd.sfx("back");
+  if (state === "move") deselect();
+  else if (state === "menu") { selected.x = origin.x; selected.y = origin.y; moveMap = reachable(selected); state = "move"; }
+  else if (state === "weapon") state = "menu";
+  else if (state === "target") backFromTarget();
+}
+function chooseWeapon(w) {
+  selW = w; targets = enemiesInRange(selected, selected.x, selected.y, w); state = "target"; Snd.sfx("blip");
+}
+cv.addEventListener("mousemove", e => { hover = cellFromEvent(e); mouse = pixelFromEvent(e); updateInfo(); });
+cv.addEventListener("contextmenu", e => { e.preventDefault(); cancel(); });
+window.addEventListener("keydown", e => {
+  if (dlg) { if (e.key === " " || e.key === "Enter") { e.preventDefault(); dlgAdvance(); } return; }
+  if (helpOpen()) { if (e.key === "Escape" || e.key === "h" || e.key === "H") closeHelp(); return; }
+  if (e.key === "h" || e.key === "H" || e.key === "?") { openHelp(); return; }
+  if (e.key === "t" || e.key === "T") { toggleThreat(); return; }
+  if (e.key === "Escape") cancel();
+});
+$end.addEventListener("click", () => { Snd.sfx("blip"); endPlayerTurn(); });
+$snd.addEventListener("click", () => Snd.toggle());
+document.getElementById("helpBtn").addEventListener("click", openHelp);
+document.getElementById("helpClose").addEventListener("click", closeHelp);
+document.getElementById("threatBtn").addEventListener("click", toggleThreat);
+cv.addEventListener("click", e => {
+  if (dlg) { const m = pixelFromEvent(e); if (m.x > 546 && m.x < 632 && m.y > 10 && m.y < 36) dlgEnd(); else dlgAdvance(); return; }
+  if (scene) { skipScene = true; return; }
+  if (busy || state === "over" || state === "enemy") return;
+  const c = cellFromEvent(e);
+  if (!inMap(c.x, c.y)) return;
+  const u = unitAt(c.x, c.y);
+  if (state === "select") {
+    if (u && u.team === "p" && !u.acted) {
+      selected = u; origin = { x: u.x, y: u.y }; moveMap = reachable(u); state = "move"; Snd.sfx("blip");
+    }
+  } else if (state === "move") {
+    if (u && u.team === "p" && u !== selected && !u.acted) { selected = u; origin = { x: u.x, y: u.y }; moveMap = reachable(u); Snd.sfx("blip"); }
+    else if (moveMap.has(c.x + "," + c.y)) {
+      selected.x = c.x; selected.y = c.y; moveMap = null;
+      options = availableWeapons(selected);
+      state = "menu"; Snd.sfx("blip");
+    } else deselect();                                  // clic fuera: cancela la seleccion
+  } else if (state === "menu" || state === "weapon") {
+    const m = pixelFromEvent(e);
+    const r = menuRects.find(r => m.x >= r.x && m.x < r.x + r.w && m.y >= r.y && m.y < r.y + r.h);
+    if (!r) { if (state === "menu") { deselect(); Snd.sfx("back"); } else { state = "menu"; Snd.sfx("back"); } return; }
+    if (r.act === "attack") { options = availableWeapons(selected); if (options.length === 1) chooseWeapon(options[0]); else { state = "weapon"; Snd.sfx("blip"); } }
+    else if (r.act === "w") chooseWeapon(r.wp);
+    else { Snd.sfx("blip"); finishUnit(selected); }
+  } else if (state === "target") {
+    if (u && targets.includes(u)) {
+      busy = true;
+      const a = selected, w = selW;
+      targets = null;
+      fight(a, w, u).then(async () => { await midEvent(); busy = false; finishUnit(a); });
+    } else { backFromTarget(); Snd.sfx("back"); }
+  }
+  setTimeout(updateInfo, 0);
+});
+function updateInfo() {
+  const hu = inMap(hover.x, hover.y) ? unitAt(hover.x, hover.y) : null;
+  const u = hu || selected;
+  showFace(u);
+  if (!inMap(hover.x, hover.y)) return;
+  const t = tile(hover.x, hover.y);
+  let html = "";
+  if (u) {
+    const pct = Math.round(100 * u.hp / u.maxhp);
+    html += "<b>" + u.name + "</b>" + (u.leader ? " ★" : "") + "<br>" + CLASSES[u.cls].label + " · " + (u.team === "p" ? B.pName : "Realistas") +
+      "<br>PV " + u.hp + "/" + u.maxhp + " <span class='bar'><i style='width:" + pct + "%'></i></span>" +
+      "<br>Fue " + u.str + " · Hab " + u.skl + " · Vel " + u.spd +
+      "<br>Def " + u.def + " · Sue " + u.lck + " · Mov " + movOf(u) +
+      "<br>" + (u.weapons.length ? u.weapons.map((w, i) => (i === 0 ? "<b>" + w.name + "</b>" : w.name) + " " + w.uses).join(" · ") : "<i>sin armas</i>");
+  } else html += "Selecciona una unidad.";
+  html += "<br><span style='color:#b9a77a'>Terreno: " + t.name + (t.def ? " (+" + t.def + " def" + (t.avoid ? ", +" + t.avoid + " esq" : "") + ")" : "") + (t.cost ? "" : " (intransitable)") + "</span>";
+  $info.innerHTML = html;
+}
+
+// ================= DIBUJO DEL MAPA =================
+const RES = 2;                         // resolucion interna del lienzo (nitidez)
+let LWMUL = 1;                         // multiplicador de grosor de linea (sprites pequenos)
+let banner = null;
+function rnd(x, y, n) { let h = (x * 374761393 + y * 668265263 + n * 2147483647) | 0; h = (h ^ (h >> 13)) * 1274126177; return ((h ^ (h >> 16)) >>> 0) / 4294967295; }
+const isLand = (x, y) => inMap(x, y) && MAP[y][x] !== "~";
+function showBanner(text, col) { if (!fastMode) banner = { text, col, t0: performance.now() }; }
+
+function drawTile(x, y, t) {
+  const ch = MAP[y][x], px = x * TS, py = y * TS;
+  if (ch === "~") {
+    const g = ctx.createLinearGradient(px, py, px + TS, py + TS); g.addColorStop(0, "#2c68a0"); g.addColorStop(1, "#3b84ba");
+    ctx.fillStyle = g; ctx.fillRect(px, py, TS, TS);
+    ctx.fillStyle = "rgba(255,255,255,.26)";
+    for (let i = 0; i < 3; i++) { const o = (Math.sin(t / 600 + x * 1.3 + y * 2 + i * 2) + 1) * 5; ctx.fillRect(px + 5 + o + i * 9, py + 8 + i * 12, 9, 1.6); }
+    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {                       // orilla con arena y espuma
+      if (!isLand(x + dx, y + dy)) continue;
+      const wob = Math.sin(t / 500 + x + y) * 1.2;
+      ctx.fillStyle = "#dcc88e";
+      if (dx === -1) { ctx.fillRect(px, py, 5, TS); ctx.fillStyle = "rgba(255,255,255,.65)"; ctx.fillRect(px + 5 + wob, py, 2, TS); }
+      if (dx === 1)  { ctx.fillRect(px + TS - 5, py, 5, TS); ctx.fillStyle = "rgba(255,255,255,.65)"; ctx.fillRect(px + TS - 7 - wob, py, 2, TS); }
+      if (dy === -1) { ctx.fillRect(px, py, TS, 5); ctx.fillStyle = "rgba(255,255,255,.65)"; ctx.fillRect(px, py + 5 + wob, TS, 2); }
+      if (dy === 1)  { ctx.fillRect(px, py + TS - 5, TS, 5); ctx.fillStyle = "rgba(255,255,255,.65)"; ctx.fillRect(px, py + TS - 7 - wob, TS, 2); }
+    }
+    return;
+  }
+  if (ch === "R") { drawRock(x, y, t); return; }
+  ctx.fillStyle = (x + y) % 2 ? "#78a24a" : "#739d46"; ctx.fillRect(px, py, TS, TS);
+  if (rnd(x, y, 30) > 0.5) { ctx.fillStyle = "rgba(55,95,28,.16)"; ctx.beginPath(); ctx.ellipse(px + 8 + rnd(x, y, 31) * 24, py + 8 + rnd(x, y, 32) * 24, 11, 6, 0, 0, 7); ctx.fill(); }
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 6; i++) {
+    const bx = px + 3 + rnd(x, y, i) * 34, by = py + 8 + rnd(x, y, i + 9) * 28, sw = Math.sin(t / 700 + bx * 0.1) * 0.8;
+    ctx.strokeStyle = i % 2 ? "#5f8a37" : "#8cba5c"; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx + sw, by - 4); ctx.moveTo(bx + 2, by); ctx.lineTo(bx + 2 + sw, by - 3); ctx.stroke();
+  }
+  if (rnd(x, y, 20) > 0.78) {
+    const fx = px + 5 + rnd(x, y, 22) * 30, fy = py + 6 + rnd(x, y, 23) * 28;
+    ctx.fillStyle = rnd(x, y, 21) > 0.5 ? "#f6e47c" : "#fbf6ec"; ctx.beginPath(); ctx.arc(fx, fy, 1.7, 0, 7); ctx.fill();
+    ctx.fillStyle = "#e0a030"; ctx.beginPath(); ctx.arc(fx, fy, 0.6, 0, 7); ctx.fill();
+  }
+  if (ch === "S") drawCrops(x, y, t);
+}
+function drawTreeVec(x, y, t) {
+  const px = x * TS, py = y * TS, sw = Math.sin(t / 900 + x * 2 + y) * 0.8;
+  ctx.fillStyle = "rgba(0,0,0,.26)"; ctx.beginPath(); ctx.ellipse(px + 20, py + 35, 14, 4, 0, 0, 7); ctx.fill();
+  PP(ctx, `M${px + 17},${py + 36} L${px + 18},${py + 22} L${px + 22},${py + 22} L${px + 23},${py + 36} Z`, "#5a3a20", "#2e1c0e", 1);
+  const crowns = [[20 + sw, 13, 12, "#2f6b2c"], [12 + sw, 19, 9, "#3a7d34"], [28 + sw, 19, 9, "#2b6027"], [20 + sw, 22, 9, "#337530"]];
+  for (const [cx, cy, r, col] of crowns) { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(px + cx, py + cy, r, 0, 7); ctx.fill(); }
+  ctx.strokeStyle = "#1f4a1d"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(px + 20 + sw, py + 13, 12, 3.3, 6.1); ctx.stroke();
+  ctx.fillStyle = "rgba(150,220,110,.55)"; ctx.beginPath(); ctx.arc(px + 16 + sw, py + 9, 5, 0, 7); ctx.fill();
+  ctx.fillStyle = "rgba(150,220,110,.35)"; ctx.beginPath(); ctx.arc(px + 9 + sw, py + 16, 3, 0, 7); ctx.fill();
+}
+function drawConvent(X, Y, Wd, Hd) {
+  ctx.fillStyle = "rgba(0,0,0,.28)"; ctx.beginPath(); ctx.ellipse(X + Wd / 2 + 4, Y + Hd - 1, Wd / 2 + 2, 6, 0, 0, 7); ctx.fill();
+  const wy = Y + Hd * 0.4;
+  PP(ctx, `M${X + 3},${wy} L${X + Wd - 3},${wy} L${X + Wd - 3},${Y + Hd - 3} L${X + 3},${Y + Hd - 3} Z`, "#ebe0c6", "#7a6a48", 1.2);
+  PP(ctx, `M${X + Wd - 12},${wy} L${X + Wd - 3},${wy} L${X + Wd - 3},${Y + Hd - 3} L${X + Wd - 12},${Y + Hd - 3} Z`, "#b9ab88", null, 0, 0.45);
+  PP(ctx, `M${X + 3},${Y + Hd - 10} L${X + Wd - 3},${Y + Hd - 10} L${X + Wd - 3},${Y + Hd - 3} L${X + 3},${Y + Hd - 3} Z`, "#b8a982", null, 0, 0.6);
+  PP(ctx, `M${X - 3},${wy + 2} L${X + Wd * 0.13},${Y + 5} L${X + Wd * 0.87},${Y + 5} L${X + Wd + 3},${wy + 2} Z`, "#b7492f", "#6a2616", 1.3);
+  ctx.strokeStyle = "rgba(90,25,12,.55)"; ctx.lineWidth = 1; ctx.beginPath();
+  for (let i = 1; i <= 4; i++) { const yy = Y + 5 + i * (wy - Y - 3) / 5.2; ctx.moveTo(X + Wd * 0.13 - i * 1.6, yy); ctx.lineTo(X + Wd * 0.87 + i * 1.6, yy); }
+  ctx.stroke();
+  PP(ctx, `M${X + Wd * 0.14},${Y + 6} L${X + Wd * 0.86},${Y + 6}`, null, "#d9795c", 1.6);
+  for (const wxr of [0.16, 0.66]) {                                                                   // ventanas con arco
+    const wx = X + Wd * wxr, ww = Wd * 0.18, wt = wy + 8;
+    PP(ctx, `M${wx},${wt + 18} L${wx},${wt + 6} C${wx},${wt - 2} ${wx + ww},${wt - 2} ${wx + ww},${wt + 6} L${wx + ww},${wt + 18} Z`, "#2a3350", "#fff6dc", 1.4);
+    PP(ctx, `M${wx + ww / 2},${wt - 1} L${wx + ww / 2},${wt + 18}`, null, "#fff6dc", 0.8);
+  }
+  const dx0 = X + Wd * 0.42, dw = Wd * 0.16, dt = Y + Hd - 24;
+  PP(ctx, `M${dx0},${Y + Hd - 3} L${dx0},${dt + 8} C${dx0},${dt - 2} ${dx0 + dw},${dt - 2} ${dx0 + dw},${dt + 8} L${dx0 + dw},${Y + Hd - 3} Z`, "#5a3a20", "#2e1c0e", 1.2);
+  disc(ctx, dx0 + dw - 3, Y + Hd - 12, 0.9, GOLD, null);
+  PP(ctx, `M${X + Wd / 2},${Y - 6} L${X + Wd / 2},${Y + 7} M${X + Wd / 2 - 4},${Y - 2} L${X + Wd / 2 + 4},${Y - 2}`, null, "#f4ead0", 2);   // cruz
+}
+function drawUnit(u, t) {
+  const px = u.x * TS, py = u.y * TS, p = u.team === "p", gray = u.acted && p, sel = u === selected;
+  const bob = Math.sin(t / 300 + u.id) * (sel ? 1.8 : 0.8) - (sel ? 2 : 0);
+  ctx.fillStyle = "rgba(0,0,0,.3)"; ctx.beginPath(); ctx.ellipse(px + 20, py + 35, 15, 4, 0, 0, 7); ctx.fill();
+  ctx.strokeStyle = gray ? "rgba(150,150,150,.8)" : p ? "rgba(100,170,255,.95)" : "rgba(255,95,75,.95)"; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.ellipse(px + 20, py + 35, 16, 5, 0, 0, 7); ctx.stroke();
+  ctx.save();
+  if (gray) ctx.filter = "grayscale(1) brightness(.72)";
+  if (u.flash > 0 && u.flash % 4 < 2) ctx.globalAlpha = 0.45;
+  ctx.translate(px + 20, py + 35 + bob);
+  const s = u.cls === "cav" ? 0.2 : 0.235;
+  ctx.scale(p ? s : -s, s);
+  LWMUL = 2.4;
+  const wt = (u.weapons[0] || {}).type;
+  if (u.cls === "cav") bigCav(ctx, u, t, wt); else if (u.cls === "inf") bigInf(ctx, u, t, wt); else bigArt(ctx, u, t);
+  LWMUL = 1;
+  ctx.restore();
+  const bw = 32, bx = px + 4, by = py + 38, r = Math.max(0, u.hp / u.maxhp);
+  ctx.fillStyle = "rgba(0,0,0,.7)"; ctx.fillRect(bx - 1, by - 1, bw + 2, 5);
+  ctx.fillStyle = hpColor(r); ctx.fillRect(bx, by, bw * r, 3);
+  ctx.fillStyle = "rgba(255,255,255,.35)"; ctx.fillRect(bx, by, bw * r, 1);
+  if (u.leader) { ctx.font = "bold 13px Georgia"; ctx.textAlign = "center"; ctx.fillStyle = "#000"; ctx.fillText("★", px + 33, py + 9); ctx.fillStyle = "#ffd84a"; ctx.fillText("★", px + 32, py + 8); ctx.textAlign = "left"; }
+}
+function drawRange(cells, fill, edge, t, k = 1) {                         // zona de movimiento / ataque estilo Fire Emblem
+  const set = new Set(cells.map(c => c.x + "," + c.y)), pulse = (k * (0.6 + 0.08 * Math.sin(t / 260))).toFixed(2);
+  ctx.fillStyle = fill.replace("A", pulse);
+  for (const c of cells) ctx.fillRect(c.x * TS, c.y * TS, TS, TS);
+  ctx.strokeStyle = edge; ctx.lineWidth = 2; ctx.beginPath();
+  for (const c of cells) {
+    const x0 = c.x * TS, y0 = c.y * TS;
+    if (!set.has((c.x - 1) + "," + c.y)) { ctx.moveTo(x0 + 1, y0); ctx.lineTo(x0 + 1, y0 + TS); }
+    if (!set.has((c.x + 1) + "," + c.y)) { ctx.moveTo(x0 + TS - 1, y0); ctx.lineTo(x0 + TS - 1, y0 + TS); }
+    if (!set.has(c.x + "," + (c.y - 1))) { ctx.moveTo(x0, y0 + 1); ctx.lineTo(x0 + TS, y0 + 1); }
+    if (!set.has(c.x + "," + (c.y + 1))) { ctx.moveTo(x0, y0 + TS - 1); ctx.lineTo(x0 + TS, y0 + TS - 1); }
+  }
+  ctx.stroke();
+}
+function drawCursor(cx, cy, t) {                                   // esquinas animadas
+  const x = cx * TS, y = cy * TS, o = 1 + Math.abs(Math.sin(t / 240)) * 2.5, L = 9;
+  for (const [col, lw] of [["#000", 4.4], ["#fff", 2.2]]) {
+    ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.lineCap = "round"; ctx.beginPath();
+    ctx.moveTo(x - o, y - o + L); ctx.lineTo(x - o, y - o); ctx.lineTo(x - o + L, y - o);
+    ctx.moveTo(x + TS + o - L, y - o); ctx.lineTo(x + TS + o, y - o); ctx.lineTo(x + TS + o, y - o + L);
+    ctx.moveTo(x - o, y + TS + o - L); ctx.lineTo(x - o, y + TS + o); ctx.lineTo(x - o + L, y + TS + o);
+    ctx.moveTo(x + TS + o - L, y + TS + o); ctx.lineTo(x + TS + o, y + TS + o); ctx.lineTo(x + TS + o, y + TS + o - L);
+    ctx.stroke();
+  }
+  ctx.lineCap = "butt";
+}
+function drawTerrainWindow() {
+  if (!inMap(hover.x, hover.y)) return;
+  const tl = tile(hover.x, hover.y), w = 140, h = 46, x = hover.x >= 8 ? 8 : 640 - 8 - w, y = 440 - 8 - h;
+  ctx.fillStyle = "rgba(14,20,44,.92)"; ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = "#e8c872"; ctx.lineWidth = 2; ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
+  ctx.textAlign = "left"; ctx.fillStyle = "#ffe9a8"; ctx.font = "bold 14px Georgia"; ctx.fillText(tl.name, x + 10, y + 19);
+  ctx.fillStyle = "#d8d0b8"; ctx.font = "12px Georgia";
+  ctx.fillText(tl.cost ? "Def +" + tl.def + "    Esq +" + tl.avoid : "Intransitable", x + 10, y + 37);
+}
+function drawBanner(now) {
+  if (!banner) return;
+  const e = now - banner.t0, D = 1500;
+  if (e > D) { banner = null; return; }
+  const k = e < 250 ? e / 250 : e > D - 300 ? (D - e) / 300 : 1, h = 60 * k, slide = (1 - Math.min(1, e / 400)) * 120;
+  ctx.save(); ctx.globalAlpha = Math.min(1, k * 1.2);
+  const g = ctx.createLinearGradient(0, 0, 640, 0); g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(0.15, banner.col); g.addColorStop(0.85, banner.col); g.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = g; ctx.fillRect(0, 190 - h / 2, 640, h);
+  ctx.fillStyle = "rgba(232,200,114,.9)"; ctx.fillRect(40, 190 - h / 2, 560, 2); ctx.fillRect(40, 190 + h / 2 - 2, 560, 2);
+  ctx.font = "bold 30px Georgia"; ctx.textAlign = "center"; ctx.fillStyle = "#000"; ctx.fillText(banner.text, 322 - slide, 201);
+  ctx.fillStyle = "#fff6d8"; ctx.fillText(banner.text, 320 - slide, 199); ctx.textAlign = "left";
+  ctx.restore();
+}
+
+// ----- menu de acciones y de armas -----
+function menuDef() {
+  if (state === "menu") {
+    const it = [];
+    if (options.length) it.push({ label: "Atacar", act: "attack" });
+    it.push({ label: "Esperar", act: "wait" });
+    return { items: it, w: 100 };
+  }
+  if (state === "weapon") return { items: options.map(w => ({ label: w.name + "  Mt" + w.mt + "  (" + w.uses + ")", act: "w", w })), w: 230 };
+  return null;
+}
+function drawMenu() {
+  menuRects = [];
+  const def = menuDef();
+  if (!def || !selected) return;
+  const w = def.w, ih = 28, h = def.items.length * ih + 8;
+  let x = (selected.x + 1) * TS + 6; if (x + w > cv.width) x = selected.x * TS - w - 6;
+  let y = selected.y * TS; if (y + h > cv.height) y = cv.height - h - 4;
+  ctx.fillStyle = "#1f2f5a"; ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = "#e8c872"; ctx.lineWidth = 2; ctx.strokeRect(x + 1, y + 1, w - 2, h - 2); ctx.lineWidth = 1;
+  ctx.font = "bold 15px Georgia"; ctx.textAlign = "left";
+  def.items.forEach((it, i) => {
+    const box = { x: x + 4, y: y + 4 + i * ih, w: w - 8, h: ih, act: it.act, wp: it.w };
+    menuRects.push(box);
+    const hov = mouse.x >= box.x && mouse.x < box.x + box.w && mouse.y >= box.y && mouse.y < box.y + box.h;
+    if (hov) { ctx.fillStyle = "#3b5fb0"; ctx.fillRect(box.x, box.y, box.w, box.h); }
+    ctx.fillStyle = it.act === "attack" ? "#ff9d8a" : "#ffffff";
+    ctx.fillText((hov ? "> " : "   ") + it.label, box.x + 6, box.y + 19);
+  });
+}
+
+// ----- ventana de pronostico (como Fire Emblem) -----
+function drawForecast(pv, defender) {
+  const x0 = 140, y0 = 6, w = 360, h = 150;
+  ctx.fillStyle = "rgba(14,20,40,.94)"; ctx.fillRect(x0, y0, w, h);
+  ctx.fillStyle = "#1d3a68"; ctx.fillRect(x0, y0, w / 2, 28); ctx.fillStyle = "#6a1d18"; ctx.fillRect(x0 + w / 2, y0, w / 2, 28);
+  ctx.strokeStyle = "#e8c872"; ctx.lineWidth = 2; ctx.strokeRect(x0 + 1, y0 + 1, w - 2, h - 2); ctx.lineWidth = 1;
+  ctx.font = "bold 14px Georgia"; ctx.textAlign = "center"; ctx.fillStyle = "#fff";
+  ctx.fillText(pv.A.u.name, x0 + w / 4, y0 + 19); ctx.fillText(defender.name, x0 + 3 * w / 4, y0 + 19);
+  const rows = [
+    ["PV",    pv.A.u.hp,  defender.hp],
+    ["Mt",    pv.A.mt + (pv.A.times > 1 ? " x2" : ""),  pv.D ? pv.D.mt + (pv.D.times > 1 ? " x2" : "") : "--"],
+    ["Golpe", pv.A.hit, pv.D ? pv.D.hit : "--"],
+    ["Crít", pv.A.crit, pv.D ? pv.D.crit : "--"]
+  ];
+  ctx.font = "bold 18px Georgia";
+  rows.forEach((r, i) => {
+    const y = y0 + 54 + i * 22;
+    ctx.fillStyle = "#ffe08a"; ctx.fillText(r[0], x0 + w / 2, y);
+    ctx.fillStyle = "#ffffff"; ctx.fillText(String(r[1]), x0 + w / 4 + 20, y); ctx.fillText(String(r[2]), x0 + 3 * w / 4 - 20, y);
+  });
+  ctx.font = "13px Georgia";
+  const tri = pv.A.tri;
+  ctx.fillStyle = "#e8e0c8"; ctx.fillText(pv.A.w.name, x0 + w / 4, y0 + h - 8);
+  ctx.fillText(pv.D ? pv.D.w.name : "no puede contraatacar", x0 + 3 * w / 4, y0 + h - 8);
+  if (tri) { ctx.font = "bold 20px Georgia"; ctx.fillStyle = tri > 0 ? "#6fe26f" : "#ff6a5a"; ctx.fillText(tri > 0 ? "▲" : "▼", x0 + w / 4 - 50, y0 + 54 + 22 * 1); ctx.fillStyle = tri > 0 ? "#ff6a5a" : "#6fe26f"; ctx.fillText(tri > 0 ? "▼" : "▲", x0 + 3 * w / 4 + 50, y0 + 54 + 22 * 1); }
+}
+function draw(t) {
+  ctx.setTransform(RES, 0, 0, RES, 0, 0);
+  if (dlg) { drawDialogue(t); return; }
+  if (scene) { drawScene(t); return; }
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) drawTile(x, y, t);
+  drawDecor(t);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (MAP[y][x] === "C" && !(x > 0 && MAP[y][x - 1] === "C") && !(y > 0 && MAP[y - 1][x] === "C")) {
+      let w = 1, h = 1; while (x + w < W && MAP[y][x + w] === "C") w++; while (y + h < H && MAP[y + h][x] === "C") h++;
+      (B.building === "rancho" ? drawRancho : drawConvent)(x * TS, y * TS, w * TS, h * TS);
+    }
+  }
+  if (showThreat && state !== "enemy") drawRange(threatCells(), "rgba(255,30,30,A)", "#ff8a7a", t, 0.7);
+  if (moveMap) drawRange([...moveMap.keys()].map(k => { const [x, y] = k.split(",").map(Number); return { x, y }; }), "rgba(30,90,255,A)", "#cfe0ff", t);
+  if (targets && state === "target") drawRange(targets.map(e => ({ x: e.x, y: e.y })), "rgba(255,50,50,A)", "#ffa0a0", t);
+  const items = [];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (MAP[y][x] === "T") items.push({ k: y + 0.6, f: () => drawTree(x, y, t) });
+  for (const u of alive()) items.push({ k: u.y + 0.7, f: () => { if (u.flash > 0) u.flash--; drawUnit(u, t); } });
+  items.sort((a, b) => a.k - b.k); for (const it of items) it.f();
+  if (selected) { ctx.strokeStyle = "rgba(255,255,255," + (0.6 + 0.3 * Math.sin(t / 200)).toFixed(2) + ")"; ctx.lineWidth = 2; ctx.strokeRect(selected.x * TS + 1, selected.y * TS + 1, TS - 2, TS - 2); }
+  if (inMap(hover.x, hover.y) && state !== "enemy") drawCursor(hover.x, hover.y, t);
+  drawTerrainWindow();
+  drawMenu();
+  if (state === "target" && targets && selW) {                                   // pronostico al pasar sobre un enemigo
+    const hu = inMap(hover.x, hover.y) ? unitAt(hover.x, hover.y) : null;
+    if (hu && targets.includes(hu)) drawForecast(preview(selected, selW, hu), hu);
+  }
+  drawBanner(t);
+}
+function loop(t) { draw(t); requestAnimationFrame(loop); }
+
+// ================= RETRATOS (vectoriales, estilo pintado) =================
+const SKIN = {
+  fair: ["#f3cba7", "#dca984", "#b88260"],
+  tan:  ["#e2b089", "#c58c64", "#9f6c4a"],
+  dark: ["#c9906a", "#a8724e", "#82553b"],
+  old:  ["#edc9a8", "#d0a587", "#a8806a"]
+};
+const GOLD = "#e8c25a", GOLD_D = "#a8802a", INK = "#1c1410";
+const FACES = {
+  1:  { skin: "tan",  hair: "#241710", hairHi: "#4a3220", eye: "#3a2616", style: "swept", hat: "bicorne", coat: "#274f95", collar: "#b3261e", brow: 3.2, jaw: 1.05, nose: 1.15, side: true,  sash: true,  belts: false, epa: true,  lines: 1 },
+  2:  { skin: "fair", hair: "#3a2615", hairHi: "#5a3d24", eye: "#4a3a28", style: "cropped", hat: "shako", hatCol: "#1d3d6b", coat: "#274f95", collar: "#b3261e", brow: 2.6, jaw: 1.0, nose: 1.0, stache: true, belts: true, epa: true },
+  3:  { skin: "fair", hair: "#6a4424", hairHi: "#8d6238", eye: "#3d6a8a", style: "short", hat: "none", coat: "#274f95", collar: "#b3261e", brow: 2.0, jaw: 0.93, nose: 0.95, belts: false, epa: true, sash: false },
+  4:  { skin: "dark", hair: "#130c08", hairHi: "#2c1d14", eye: "#1e1410", style: "cropped", hat: "shako", hatCol: "#1d3d6b", coat: "#2d5aa8", collar: "#b3261e", brow: 3.0, jaw: 1.08, nose: 1.25, stache: true, belts: true, scar: true },
+  17: { skin: "old",  hair: "#cfcfd4", hairHi: "#f0f0f4", eye: "#4d5b66", style: "swept", hat: "tricorn", coat: "#a5281d", collar: "#262626", brow: 2.2, jaw: 1.0, nose: 1.3, side: true, belts: false, epa: true, lines: 2, browCol: "#b8b8bd" },
+  gran: { skin: "tan",  hair: "#3a2a1a", hairHi: "#5a4028", eye: "#3a2a1a", style: "cropped", hat: "shako", hatCol: "#1d3d6b", coat: "#3568b8", collar: "#b3261e", brow: 2.2, jaw: 1.0, nose: 1.0, belts: true },
+  inf:  { skin: "fair", hair: "#5a4028", hairHi: "#7a5a38", eye: "#4a3a28", style: "cropped", hat: "tricorn", coat: "#b8301f", collar: "#efe6c8", brow: 2.2, jaw: 1.0, nose: 1.0, belts: true },
+  art:  { skin: "tan",  hair: "#241810", hairHi: "#3a2a1c", eye: "#2a1c10", style: "cropped", hat: "cap", coat: "#b8301f", collar: "#222222", brow: 2.6, jaw: 1.04, nose: 1.1, stache: true, belts: false }
+};
+function faceSpec(u) {
+  if (FACES[u.id]) return FACES[u.id];
+  const base = (u.face && FACES[u.face]) || (u.team === "p" ? FACES.gran : (u.cls === "art" ? FACES.art : FACES.inf));
+  const skins = ["fair", "tan", "dark", "tan"], hairs = ["#3a2a1a", "#241810", "#6a4424", "#171008", "#4a3220"];
+  return Object.assign({}, base, { skin: skins[u.id % skins.length], hair: hairs[u.id % hairs.length], hairHi: "#5a4028",
+    jaw: 0.96 + (u.id % 4) * 0.035, nose: 0.92 + (u.id % 3) * 0.12, stache: base.stache || (u.id % 3 === 0 && u.cls !== "cav"), brow: 2 + (u.id % 3) * 0.4 });
+}
+function dk(hex, k) { const n = parseInt(hex.slice(1), 16); const f = c => Math.max(0, Math.min(255, Math.round(c * k))).toString(16).padStart(2, "0"); return "#" + f(n >> 16) + f((n >> 8) & 255) + f(n & 255); }
+
+// mood: "neutral" | "serious" | "angry" | "smile" | "sad"
+function drawFace(c, f, team, x, y, size, mood) {
+  mood = mood || "neutral";
+  const [sk, ssh, sdk] = SKIN[f.skin], p = team === "p";
+  c.save(); c.translate(x, y); c.scale(size / 100, size / 100);
+  c.beginPath(); c.rect(0, 0, 100, 100); c.clip();
+  c.lineJoin = "round"; c.lineCap = "round";
+  const P = (d, fill, stroke, lw, alpha) => {
+    const path = new Path2D(d); c.save(); if (alpha != null) c.globalAlpha = alpha;
+    if (fill) { c.fillStyle = fill; c.fill(path); }
+    if (stroke) { c.strokeStyle = stroke; c.lineWidth = lw || 1.3; c.stroke(path); }
+    c.restore();
+  };
+  const circle = (cx, cy, r, fill, stroke, lw) => { c.beginPath(); c.arc(cx, cy, r, 0, 7); if (fill) { c.fillStyle = fill; c.fill(); } if (stroke) { c.strokeStyle = stroke; c.lineWidth = lw || 1; c.stroke(); } };
+  // fondo
+  const bg = c.createLinearGradient(0, 0, 0, 100);
+  bg.addColorStop(0, p ? "#6b97c9" : "#c4685a"); bg.addColorStop(1, p ? "#2a4a74" : "#55261f");
+  c.fillStyle = bg; c.fillRect(0, 0, 100, 100);
+  const glow = c.createRadialGradient(50, 40, 6, 50, 45, 62); glow.addColorStop(0, "rgba(255,255,235,.38)"); glow.addColorStop(1, "rgba(255,255,235,0)");
+  c.fillStyle = glow; c.fillRect(0, 0, 100, 100);
+
+  // ---- casaca y hombros ----
+  const coatD = dk(f.coat, 0.68);
+  P("M-2,102 L-2,93 C4,84 18,80 33,77 L67,77 C82,80 96,84 102,93 L102,102 Z", f.coat, INK, 1.4);
+  P("M66,77 C82,80 96,84 102,93 L102,102 L74,102 C78,92 74,83 66,77 Z", coatD, null, 0, 0.55);
+  if (f.belts) {                                                            // correajes blancos cruzados
+    P("M22,80 L34,77 L80,102 L64,102 Z", "#f2eee2", INK, 1);
+    P("M78,80 L66,77 L20,102 L36,102 Z", "#e4dfd0", INK, 1);
+    circle(50, 91, 3.4, GOLD, GOLD_D, 0.8);
+  }
+  if (f.sash) {                                                             // banda celeste y blanca
+    P("M16,84 L30,80 L86,102 L66,102 Z", "#8fcff0", INK, 1);
+    P("M21,85 L28,83 L74,102 L69,102 Z", "#ffffff", null);
+  }
+  if (!f.belts) { for (const by of [90, 96]) circle(50, by, 1.7, GOLD, GOLD_D, 0.6); }
+  // cuello (piel)
+  P("M41,64 L59,64 L61,79 C56,84 44,84 39,79 Z", ssh, INK, 1.3);
+  P("M41,64 L59,64 L59,72 C54,75 46,75 41,72 Z", sdk, null, 0, 0.45);
+  // cuello alto del uniforme
+  for (const s of [-1, 1]) {
+    const mx = v => 50 + s * (v - 50);
+    P(`M${mx(37)},73 L${mx(46)},69 L${mx(48)},86 L${mx(33)},84 Z`, f.collar, INK, 1.2);
+    P(`M${mx(37)},73 L${mx(46)},69`, null, GOLD, 1.1);
+  }
+  if (f.epa) for (const s of [-1, 1]) {                                     // charreteras
+    const ex = 50 + s * 38;
+    P(`M${ex - 9},84 C${ex - 9},79 ${ex + 9},79 ${ex + 9},84 L${ex + 9},90 C${ex + 9},93 ${ex - 9},93 ${ex - 9},90 Z`, GOLD, GOLD_D, 1.1);
+    for (let i = -7; i <= 7; i += 3.5) P(`M${ex + i},91 L${ex + i},97`, null, GOLD_D, 1.3);
+    P(`M${ex - 7},86 L${ex + 7},86`, null, GOLD_D, 0.7);
+  }
+
+  // ---- cabeza (con ancho de mandibula variable) ----
+  c.save(); c.translate(50, 0); c.scale(f.jaw, 1); c.translate(-50, 0);
+  for (const s of [-1, 1]) {                                                // orejas
+    const ex = 50 + s * 19;
+    P(`M${ex},43 C${ex + s * 5},42 ${ex + s * 6},52 ${ex + s * 2},56 C${ex},58 ${ex - s * 1},50 ${ex},43 Z`, sk, INK, 1.1);
+    P(`M${ex + s * 1.5},46 C${ex + s * 3.6},47 ${ex + s * 3.4},51 ${ex + s * 1.6},53`, null, ssh, 1);
+  }
+  P("M31,45 C30,29 40,21 50,21 C60,21 70,29 69,45 C69,58 63,71 50,75 C37,71 31,58 31,45 Z", sk, INK, 1.5);
+  P("M63,26 C69,32 69.5,40 69,48 C69,60 63,71 50,75 C58,66 61,56 61,46 C61,38 60,31 63,26 Z", ssh, null, 0, 0.6);   // sombra lateral
+  P("M40,70 C46,74 54,74 60,70 C58,73 54,76 50,76 C46,76 42,73 40,70 Z", sdk, null, 0, 0.35);                          // bajo la mandibula
+  if (f.scar) P("M60,50 L55,58", null, "#a0584a", 1.3);
+  // cejas
+  const tilt = { neutral: [40.8, 39.4], serious: [40.6, 39.2], angry: [42.6, 38.2], smile: [40.2, 39.6], sad: [38.8, 41.2] }[mood] || [40.8, 39.4];
+  c.strokeStyle = f.browCol || f.hair; c.lineWidth = f.brow;
+  for (const s of [-1, 1]) {
+    const ix = 50 + s * 3.8, ox = 50 + s * 13.2;
+    c.beginPath(); c.moveTo(ix, tilt[0]); c.quadraticCurveTo(50 + s * 8.5, Math.min(tilt[0], tilt[1]) - 1.6, ox, tilt[1]); c.stroke();
+  }
+  // ojos
+  for (const s of [-1, 1]) {
+    const ex = 50 + s * 8.4, ey = 47;
+    const lid = mood === "smile" ? 1.9 : 2.5;
+    P(`M${ex - 5.2},${ey} C${ex - 2.6},${ey - lid * 1.3} ${ex + 2.6},${ey - lid * 1.3} ${ex + 5.2},${ey} C${ex + 2.6},${ey + lid} ${ex - 2.6},${ey + lid} ${ex - 5.2},${ey} Z`, "#fbf8f0", INK, 0.9);
+    circle(ex + s * 0.3, ey - 0.1, 2.35, f.eye);
+    circle(ex + s * 0.3, ey - 0.1, 1.15, "#0e0a08");
+    circle(ex - 0.7, ey - 1, 0.75, "#ffffff");
+    P(`M${ex - 5.4},${ey + 0.2} C${ex - 2.6},${ey - lid * 1.5} ${ex + 2.6},${ey - lid * 1.5} ${ex + 5.4},${ey + 0.2}`, null, INK, 1.7);
+    P(`M${ex - 4.6},${ey - lid * 1.7 - 0.8} C${ex - 2},${ey - lid * 2.2 - 1} ${ex + 2},${ey - lid * 2.2 - 1} ${ex + 4.6},${ey - lid * 1.7 - 0.8}`, null, ssh, 1, 0.7);
+  }
+  // nariz
+  const nw = 4.2 * f.nose;
+  P("M52,45 C53.4,51 53.8,55 55.6," + (58 + f.nose), null, ssh, 1.5, 0.9);
+  P(`M${50 - nw},60 C${50 - nw * 0.5},${62 + f.nose * 0.6} ${50 + nw * 0.5},${62 + f.nose * 0.6} ${50 + nw},60`, null, sdk, 1.5, 0.9);
+  circle(50 - nw * 0.55, 60.6, 0.9, sdk); circle(50 + nw * 0.55, 60.6, 0.9, sdk);
+  P("M48.6,52 C49.4,55 49.6,57 49.2,58.5", null, "#ffffff", 1, 0.3);
+  // boca y bigote
+  const mouth = { neutral: "M44.8,66.8 Q50,67.8 55.2,66.8", serious: "M45,67 Q50,67.2 55,67", angry: "M45.4,67.8 Q50,65.8 54.6,67.8", smile: "M44,66.2 Q50,70 56,66.2", sad: "M45.4,68 Q50,66.2 54.6,68" }[mood] || "";
+  P(mouth, null, "#7a3b30", 1.6);
+  if (mood !== "smile") P("M47,69.6 Q50,71.4 53,69.6", null, "#b86a58", 1.2, 0.55);
+  if (f.stache) P("M39.5,63 C43.5,59.6 48,61.6 50,62.2 C52,61.6 56.5,59.6 60.5,63 C57.5,66.4 53,64.4 50,64.6 C47,64.4 42.5,66.4 39.5,63 Z", f.hair, INK, 0.7);
+  if (f.lines) { P("M38,55 C40,59 41,62 42,64", null, ssh, 0.9, 0.7); P("M62,55 C60,59 59,62 58,64", null, ssh, 0.9, 0.7); if (f.lines > 1) { P("M40,34 C47,32.6 53,32.6 60,34", null, ssh, 0.9, 0.7); P("M41,36.4 C47,35 53,35 59,36.4", null, ssh, 0.8, 0.5); } }
+  // patillas
+  if (f.side) for (const s of [-1, 1]) { const mx = v => 50 + s * (v - 50); P(`M${mx(31.5)},37 L${mx(36.5)},37 L${mx(37.6)},57 L${mx(35)},63 L${mx(31.5)},52 Z`, f.hair, INK, 0.7); }
+  c.restore();
+
+  // ---- pelo ----
+  const HS = {
+    swept:   "M29,47 C25,26 38,15 52,16 C66,16 76,27 71,47 C70,40 69,34 64,30 C56,33 44,32 36,29 C33,34 31,40 29,47 Z",
+    cropped: "M30,45 C28,28 38,19 50,19 C62,19 72,28 70,45 C69,38 67,32 62,29 C54,31 46,31 38,29 C33,32 31,38 30,45 Z",
+    short:   "M28,48 C23,24 38,12 53,14 C69,15 78,28 72,48 C71,39 67,31 59,27 C52,32 40,30 34,36 C31,40 29,44 28,48 Z"
+  };
+  if (f.hat !== "none") P(HS[f.style === "short" ? "cropped" : f.style], f.hair, INK, 1);
+  else {
+    P(HS.short, f.hair, INK, 1.2);
+    P("M36,29 C42,24 52,22 62,27", null, f.hairHi, 1.6, 0.85); P("M33,36 C40,28 50,27 58,30", null, f.hairHi, 1.2, 0.6);
+    P("M34,33 C44,36 54,32 60,26", null, dk(f.hair, 0.6), 1, 0.7);
+  }
+  if (f.hat === "bicorne") {                                                 // bicornio (San Martin)
+    P("M6,41 C6,32 13,25 22,19 C31,14 41,11 50,11 C59,11 69,14 78,19 C87,25 94,32 94,41 C85,34 68,29 50,29 C32,29 15,34 6,41 Z", "#1a1a22", INK, 1.5);
+    P("M10,40 C20,34 34,31 50,31 C66,31 80,34 90,40", null, GOLD, 2);
+    P("M18,27 C28,19 40,16 50,16", null, "#3a3a48", 1.4, 0.8);
+    P("M30,36 C40,40 60,40 70,36 L70,41 C60,45 40,45 30,41 Z", "#000", null, 0, 0.28);
+    circle(76, 24, 5.4, "#8fcff0", INK, 1); circle(76, 24, 3.4, "#ffffff"); circle(76, 24, 1.4, "#8fcff0");
+    P("M46,14 C48,10 52,10 54,14", null, GOLD, 1.5);
+  } else if (f.hat === "shako") {                                            // chaco con penacho
+    const hc = f.hatCol || "#1d3d6b";
+    P("M50,8 C45,0 59,-1 67,4 C65,10 58,10 50,8 Z", "#c0392b", INK, 1);
+    P("M33,6 L67,6 L71,31 C60,34 40,34 29,31 Z", hc, INK, 1.5);
+    P("M33,6 L67,6 L67.4,12 L32.6,12 Z", dk(hc, 1.5), null, 0, 0.6);
+    P("M29,27 L71,27 L71,32 C60,35.4 40,35.4 29,32 Z", "#b3261e", INK, 1);
+    P("M50,13 L56,19 L50,26 L44,19 Z", GOLD, GOLD_D, 1);
+    P("M28,31 C40,35.6 60,35.6 72,31 L74,35 C60,40 40,40 26,35 Z", "#101014", INK, 1);
+    P("M30,36 C40,40 60,40 70,36 L70,40 C60,44 40,44 30,40 Z", "#000", null, 0, 0.3);
+  } else if (f.hat === "tricorn") {                                          // tricornio
+    P("M7,36 L26,17 C36,11 64,11 74,17 L93,36 C81,31 66,30 50,30 C34,30 19,31 7,36 Z", "#1b1b1f", INK, 1.5);
+    P("M9,35 C21,31 36,30.4 50,30.4 C64,30.4 79,31 91,35", null, "#f1ecdc", 2);
+    P("M30,16 C38,12.6 62,12.6 70,16", null, "#3d3d48", 1.3, 0.8);
+    circle(50, 22, 4.8, "#f1ecdc", INK, 0.9); circle(50, 22, 2.2, p ? "#8fcff0" : "#c0392b");
+    P("M30,36 C40,40 60,40 70,36 L70,40 C60,44 40,44 30,40 Z", "#000", null, 0, 0.3);
+  } else if (f.hat === "gaucho") {                                         // sombrero de gaucho con barbijo
+    P("M10,35 C14,26 28,21 50,21 C72,21 86,26 90,35 C80,40 66,42 50,42 C34,42 20,40 10,35 Z", "#1a1a1e", INK, 1.5);
+    P("M30,23 C31,9 69,9 70,23 C60,20 40,20 30,23 Z", "#26262c", INK, 1.4);
+    P("M30.5,21 L69.5,21", null, "#8a1c14", 2.4);
+    P("M33,36 C30,52 36,64 44,72", null, "#2a1a10", 1.1); P("M67,36 C70,52 64,64 56,72", null, "#2a1a10", 1.1);
+    P("M30,38 C40,42 60,42 70,38 L70,42 C60,46 40,46 30,42 Z", "#000", null, 0, 0.3);
+  } else if (f.hat === "cap") {                                              // gorro de artillero
+    P("M24,32 C25,17 38,12 50,12 C62,12 75,17 76,32 C66,28 34,28 24,32 Z", "#202026", INK, 1.5);
+    P("M24,31 L76,31 L76,35 C64,38 36,38 24,35 Z", "#101014", INK, 1);
+    circle(50, 12, 4, "#c0392b", INK, 0.9);
+    P("M30,36 C40,40 60,40 70,36 L70,40 C60,44 40,44 30,40 Z", "#000", null, 0, 0.3);
+  }
+  // marco interior y viñeta
+  const vg = c.createRadialGradient(50, 50, 38, 50, 50, 78); vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,.4)");
+  c.fillStyle = vg; c.fillRect(0, 0, 100, 100);
+  c.restore();
+}
+function drawPortrait(c, u, x, y, size, mood) { drawFace(c, faceSpec(u), u.team, x, y, size, mood); }
+function showFace(u) {
+  const key = u ? u.id : 0;
+  if (key === faceShown) return;
+  faceShown = key;
+  fctx.clearRect(0, 0, 96, 96);
+  if (u) drawPortrait(fctx, u, 0, 0, 96);
+  else { fctx.fillStyle = "#1b1410"; fctx.fillRect(0, 0, 96, 96); }
+}
+
+// ================= ESCENA DE COMBATE (estilo Fire Emblem GBA) =================
+const SC = { S: 4, ground: 285, lx: 170, rx: 470 };
+function tween(ms, fn) {
+  return new Promise(res => {
+    const t0 = performance.now(); fn(0);
+    (function step(now) {
+      const dur = skipScene ? ms / 5 : ms;
+      const p = Math.min(1, (now - t0) / dur);
+      fn(p);
+      if (p < 1) requestAnimationFrame(step); else res();
+    })(t0);
+  });
+}
+async function openScene(a, d, pv) {
+  const left = a.team === "p" ? a : d, right = left === a ? d : a;
+  skipScene = false;
+  scene = { left, right, pv, off: { L: 0, R: 0 }, fade: { L: 1, R: 1 }, hp: { [a.id]: a.hp, [d.id]: d.hp },
+            alpha: 0, shake: 0, text: null, proj: null, msg: "", muzzle: null, flashCrit: 0,
+            wt: { L: (left.weapons[0] || {}).type, R: (right.weapons[0] || {}).type } };
+  await tween(250, p => scene.alpha = p);
+  await tween(350, () => {});
+}
+async function closeScene() {
+  await tween(250, p => scene.alpha = 1 - p);
+  scene = null;
+}
+async function applyHit(d, dmg, dSide, crit) {
+  d.flash = 16; scene.shake = crit ? 26 : 12;
+  if (crit) scene.flashCrit = 14;
+  scene.text = { side: dSide, text: "-" + dmg, t: 0, crit };
+  Snd.sfx(crit ? "crit" : "hit");
+  const from = scene.hp[d.id], to = Math.max(0, from - dmg);
+  d.hp = to;
+  await tween(450, p => scene.hp[d.id] = from + (to - from) * p);
+  scene.hp[d.id] = to;
+}
+async function strike(s, tgt, hit, crit, dmg) {
+  const att = s.u;
+  log(att.name + " ataca con " + s.w.name + (hit ? (crit ? " ¡CRITICO!" : "") + " (-" + dmg + ")" : " y falla."), att.team === "p" ? "#9ec5ff" : "#ff9d8a");
+  if (fastMode) { if (hit) { tgt.hp = Math.max(0, tgt.hp - dmg); if (tgt.hp <= 0) log(tgt.name + " cae en combate."); } return; }
+  const aSide = scene.left === att ? "L" : "R", dSide = aSide === "L" ? "R" : "L", dir = aSide === "L" ? 1 : -1;
+  scene.msg = s.tri > 0 ? "¡Ventaja de arma!" : s.tri < 0 ? "Desventaja de arma" : "";
+  if (["gun", "cannon", "bola"].includes(s.w.type)) {                       // disparo
+    scene.wt[aSide] = s.w.type;
+    const mp = muzzlePos(att, s.w.type), x0 = (aSide === "L" ? SC.lx : SC.rx) + dir * mp[0], x1 = (dSide === "L" ? SC.lx : SC.rx) + (hit ? 0 : dir * 150);
+    const y0 = SC.ground + mp[1], y1 = SC.ground - 100;
+    scene.muzzle = s.w.type === "bola" ? null : { side: aSide, t: 10, dx: mp[0], dy: mp[1] };
+    Snd.sfx(s.w.type === "bola" ? "miss" : s.w.type === "cannon" ? "cannon" : "gun");
+    await tween(380, p => scene.proj = { x: x0 + (x1 - x0) * p, y: y0 + (y1 - y0) * p - Math.sin(p * Math.PI) * 18, bola: s.w.type === "bola", a: p });
+    scene.proj = null;
+    if (hit) await applyHit(tgt, dmg, dSide, crit);
+    else { scene.text = { side: dSide, text: "MISS", t: 0, miss: true }; Snd.sfx("miss"); await tween(450, () => {}); }
+  } else {                                                                 // golpe cuerpo a cuerpo
+    scene.wt[aSide] = s.w.type;
+    await tween(260, p => scene.off[aSide] = dir * 115 * p * p);
+    let hitP;
+    if (hit) hitP = applyHit(tgt, dmg, dSide, crit);
+    else {
+      scene.text = { side: dSide, text: "MISS", t: 0, miss: true }; Snd.sfx("miss");
+      hitP = tween(450, p => scene.off[dSide] = -dir * 60 * Math.sin(p * Math.PI));
+    }
+    await tween(160, () => {});
+    await tween(320, p => scene.off[aSide] = dir * 115 * (1 - p));
+    scene.off[aSide] = 0;
+    await hitP;
+    scene.off[dSide] = 0;
+  }
+  scene.msg = "";
+  if (hit && tgt.hp <= 0) { log(tgt.name + " cae en combate."); Snd.sfx("die"); await tween(550, p => scene.fade[dSide] = 1 - p); }
+  else await tween(250, () => {});
+}
+function hpColor(r) { return r > 0.5 ? "#55cc55" : r > 0.25 ? "#e0b030" : "#d04040"; }
+function drawSceneBox(u, x0) {
+  const s = scene, hp = Math.round(s.hp[u.id]);
+  const st = s.pv.A.u === u ? s.pv.A : (s.pv.D && s.pv.D.u === u ? s.pv.D : null);
+  const bgG = ctx.createLinearGradient(0, 300, 0, 440);
+  if (u.team === "p") { bgG.addColorStop(0, "#2a4f8c"); bgG.addColorStop(1, "#15294c"); } else { bgG.addColorStop(0, "#8a2a22"); bgG.addColorStop(1, "#4a1410"); }
+  ctx.fillStyle = bgG; ctx.fillRect(x0, 300, 320, 140);
+  ctx.strokeStyle = "#e8c872"; ctx.lineWidth = 3; ctx.strokeRect(x0 + 2, 302, 316, 136); ctx.lineWidth = 1;
+  drawPortrait(ctx, u, x0 + 12, 316, 72);
+  ctx.strokeStyle = "#e8c872"; ctx.strokeRect(x0 + 11.5, 315.5, 73, 73);
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#ffffff"; ctx.font = "bold 16px Georgia"; ctx.fillText(u.name, x0 + 96, 334);
+  ctx.fillStyle = "#d8d0b8"; ctx.font = "13px Georgia"; ctx.fillText((st ? st.w.name : "sin arma a este alcance") + (u.leader ? "  ★" : ""), x0 + 96, 352);
+  ctx.fillStyle = "#ffffff"; ctx.fillText("PV", x0 + 96, 378);
+  ctx.font = "bold 17px Georgia"; ctx.fillText(hp + " / " + u.maxhp, x0 + 124, 379);
+  ctx.fillStyle = "#000"; ctx.fillRect(x0 + 96, 388, 206, 12);
+  ctx.fillStyle = hpColor(s.hp[u.id] / u.maxhp); ctx.fillRect(x0 + 97, 389, 204 * Math.max(0, s.hp[u.id]) / u.maxhp, 10);
+  ctx.fillStyle = "rgba(255,255,255,.3)"; ctx.fillRect(x0 + 97, 389, 204 * Math.max(0, s.hp[u.id]) / u.maxhp, 3);
+  ctx.font = "13px Georgia"; ctx.fillStyle = "#ffe08a";
+  ctx.fillText(st ? "Mt " + st.mt + (st.times > 1 ? " x2" : "") + "    Golpe " + st.hit + "    Crít " + st.crit : "No puede contraatacar", x0 + 96, 424);
+  ctx.fillStyle = "#cfc6a8"; ctx.fillText("Terreno: " + tile(u.x, u.y).name, x0 + 12, 408);
+}
+function drawScene(t) {
+  const s = scene;
+  ctx.save();
+  ctx.globalAlpha = s.alpha;
+  if (s.shake > 0) { ctx.translate((Math.random() - .5) * s.shake, (Math.random() - .5) * s.shake); s.shake *= 0.86; if (s.shake < 0.5) s.shake = 0; }
+  const g = ctx.createLinearGradient(0, 0, 0, 230); g.addColorStop(0, "#6fb1e6"); g.addColorStop(1, "#dcedf4");
+  ctx.fillStyle = g; ctx.fillRect(-30, -30, 700, 340);
+  const sg = ctx.createRadialGradient(540, 60, 4, 540, 60, 130); sg.addColorStop(0, "rgba(255,250,210,.95)"); sg.addColorStop(1, "rgba(255,250,210,0)");
+  ctx.fillStyle = sg; ctx.fillRect(380, -20, 280, 220); disc(ctx, 540, 60, 20, "#fffbe0");
+  for (const [cx0, cy0, sc, sp] of [[60, 56, 1, 1], [300, 36, 0.8, 0.7], [440, 92, 0.9, 1.3], [180, 100, 0.7, 0.5]]) {
+    const cx = ((cx0 + t / 120 * sp) % 780) - 70;
+    ctx.fillStyle = "rgba(255,255,255,.88)";
+    for (const [dx, dy, rx, ry] of [[0, 0, 36, 13], [-24, 5, 24, 10], [26, 5, 28, 10], [4, -8, 22, 11]]) { ctx.beginPath(); ctx.ellipse(cx + dx * sc, cy0 + dy * sc, rx * sc, ry * sc, 0, 0, 7); ctx.fill(); }
+  }
+  ctx.fillStyle = "#b9d6a0"; for (let x = -20; x < 660; x += 20) ctx.fillRect(x, 200 - Math.round(18 * Math.abs(Math.sin(x / 90))), 20, 60);
+  ctx.fillStyle = "#98bb80"; for (let x = -20; x < 660; x += 20) ctx.fillRect(x, 224 - Math.round(12 * Math.abs(Math.sin(x / 60 + 1))), 20, 60);
+  for (const side of ["L", "R"]) {
+    const u = side === "L" ? s.left : s.right, x0 = side === "L" ? 0 : 320, forest = MAP[u.y][u.x] === "T";
+    ctx.fillStyle = forest ? "#4f7a35" : "#7ba24a"; ctx.fillRect(x0, 240, 320, 70);
+    ctx.fillStyle = forest ? "#3f6a2b" : "#6a9040"; ctx.fillRect(x0, 240, 320, 6);
+    ctx.fillStyle = forest ? "#436d2e" : "#6e9444"; for (let i = 0; i < 6; i++) ctx.fillRect(x0 + 20 + i * 50, 262 + (i % 3) * 12, 14, 3);
+    if (forest) for (const tx of [x0 + 18, x0 + 250]) {
+      ctx.fillStyle = "#4a3320"; ctx.fillRect(tx + 20, 190, 10, 52);
+      ctx.fillStyle = "#2f6b2c"; ctx.fillRect(tx, 140, 50, 56); ctx.fillStyle = "#3d8a39"; ctx.fillRect(tx + 8, 120, 34, 40);
+    }
+  }
+  for (const side of ["L", "R"]) {
+    const u = side === "L" ? s.left : s.right;
+    if (u.flash > 0) u.flash--;
+    ctx.save();
+    ctx.globalAlpha = s.alpha * s.fade[side];
+    ctx.translate((side === "L" ? SC.lx : SC.rx) + s.off[side], SC.ground);
+    ctx.scale(side === "L" ? 1 : -1, 1);
+    drawBigUnit(u, t, s.wt[side]);
+    ctx.restore();
+  }
+  if (s.muzzle && s.muzzle.t > 0) {
+    s.muzzle.t--;
+    const mx = s.muzzle.side === "L" ? SC.lx + s.muzzle.dx : SC.rx - s.muzzle.dx, my = SC.ground + s.muzzle.dy;
+    ctx.fillStyle = "#ffd84a"; ctx.beginPath(); ctx.arc(mx, my, 8 + s.muzzle.t, 0, 7); ctx.fill();
+    ctx.fillStyle = "#fff6c0"; ctx.beginPath(); ctx.arc(mx, my, 4 + s.muzzle.t / 2, 0, 7); ctx.fill();
+  }
+  if (s.proj) { if (s.proj.bola) drawBubbleBola(s.proj); else { ctx.fillStyle = "#222"; ctx.beginPath(); ctx.arc(s.proj.x, s.proj.y, 6, 0, 7); ctx.fill(); } }
+  if (s.shout) drawBubble(s.shout);
+  if (s.flashCrit > 0) { ctx.fillStyle = "rgba(255,255,255," + (s.flashCrit / 20) + ")"; ctx.fillRect(0, 0, 640, 300); s.flashCrit--; }
+  if (s.text) {
+    const f = s.text; f.t++;
+    if (f.t < 60) {
+      ctx.font = (f.crit ? "bold 54px" : "bold 40px") + " Georgia"; ctx.textAlign = "center";
+      const x = f.side === "L" ? SC.lx : SC.rx, y = 130 - Math.min(f.t, 25) * 1.2;
+      ctx.fillStyle = "#000"; ctx.fillText(f.text, x + 2, y + 2);
+      ctx.fillStyle = f.miss ? "#d8d8d8" : f.crit ? "#ff9a2a" : "#ffe14a"; ctx.fillText(f.text, x, y);
+    }
+  }
+  if (s.msg) {
+    ctx.font = "bold 24px Georgia"; ctx.textAlign = "center";
+    ctx.fillStyle = "#000"; ctx.fillText(s.msg, 322, 42); ctx.fillStyle = s.msg[0] === "D" ? "#ff8a7a" : "#ffd84a"; ctx.fillText(s.msg, 320, 40);
+  }
+  const vg = ctx.createRadialGradient(320, 160, 170, 320, 160, 420); vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,.38)");
+  ctx.fillStyle = vg; ctx.fillRect(0, 0, 640, 300);
+  drawSceneBox(s.left, 0);
+  drawSceneBox(s.right, 320);
+  ctx.restore();
+}
+
+// ================= SPRITES GRANDES (escena de combate) =================
+function PP(c, d, fill, stroke, lw, alpha) {
+  const path = new Path2D(d); c.save(); if (alpha != null) c.globalAlpha = alpha;
+  if (fill) { c.fillStyle = fill; c.fill(path); }
+  if (stroke) { c.strokeStyle = stroke; c.lineWidth = (lw || 1.5) * LWMUL; c.lineJoin = "round"; c.lineCap = "round"; c.stroke(path); }
+  c.restore();
+}
+function disc(c, x, y, r, fill, stroke, lw) { c.beginPath(); c.arc(x, y, r, 0, 7); if (fill) { c.fillStyle = fill; c.fill(); } if (stroke) { c.strokeStyle = stroke; c.lineWidth = (lw || 1.2) * LWMUL; c.stroke(); } }
+function bigHead(c, u, cx, cy, r, hat) {                           // cabeza con sombrero (de perfil hacia la derecha)
+  const f = faceSpec(u), [sk, ssh] = SKIN[f.skin];
+  disc(c, cx, cy, r, sk, INK, 1.4);
+  PP(c, `M${cx - r},${cy} C${cx - r},${cy - r * 1.1} ${cx + r * 0.2},${cy - r * 1.2} ${cx + r * 0.6},${cy - r * 0.6} C${cx},${cy - r * 0.5} ${cx - r * 0.6},${cy - r * 0.3} ${cx - r},${cy} Z`, f.hair, INK, 1);
+  PP(c, `M${cx + r * 0.2},${cy + r * 0.1} L${cx + r * 0.95},${cy + r * 0.3} L${cx + r * 0.3},${cy + r * 0.45} Z`, ssh, null);
+  disc(c, cx + r * 0.38, cy - r * 0.12, r * 0.12, "#111");
+  PP(c, `M${cx + r * 0.1},${cy - r * 0.38} L${cx + r * 0.7},${cy - r * 0.32}`, null, f.hair, r * 0.16);
+  if (f.stache) PP(c, `M${cx + r * 0.2},${cy + r * 0.5} C${cx + r * 0.6},${cy + r * 0.38} ${cx + r * 0.9},${cy + r * 0.5} ${cx + r * 1.0},${cy + r * 0.64}`, null, f.hair, r * 0.2);
+  const hp = u.team === "p";
+  if (hat === "bicorne") {
+    PP(c, `M${cx - r * 1.6},${cy - r * 0.55} C${cx - r * 1.2},${cy - r * 1.6} ${cx + r * 1.2},${cy - r * 1.8} ${cx + r * 1.7},${cy - r * 0.55} C${cx + r * 0.8},${cy - r * 1.0} ${cx - r * 0.8},${cy - r * 1.0} ${cx - r * 1.6},${cy - r * 0.55} Z`, "#1a1a22", INK, 1.4);
+    PP(c, `M${cx - r * 1.5},${cy - r * 0.6} C${cx - r * 0.7},${cy - r * 1.0} ${cx + r * 0.8},${cy - r * 1.0} ${cx + r * 1.6},${cy - r * 0.6}`, null, GOLD, 1.8);
+    disc(c, cx + r * 1.0, cy - r * 1.05, r * 0.2, "#8fcff0", INK, 0.8);
+  } else if (hat === "shako") {
+    PP(c, `M${cx - r * 0.3},${cy - r * 1.7} C${cx - r * 0.5},${cy - r * 2.5} ${cx + r * 0.6},${cy - r * 2.6} ${cx + r * 0.9},${cy - r * 1.9} C${cx + r * 0.6},${cy - r * 1.6} ${cx + r * 0.2},${cy - r * 1.6} ${cx - r * 0.3},${cy - r * 1.7} Z`, "#c0392b", INK, 1);
+    PP(c, `M${cx - r * 0.95},${cy - r * 0.7} L${cx - r * 0.8},${cy - r * 1.8} L${cx + r * 0.9},${cy - r * 1.8} L${cx + r * 1.05},${cy - r * 0.7} Z`, "#1d3d6b", INK, 1.4);
+    PP(c, `M${cx - r * 0.95},${cy - r * 0.78} L${cx + r * 1.05},${cy - r * 0.78} L${cx + r * 1.05},${cy - r * 0.55} L${cx - r * 0.95},${cy - r * 0.55} Z`, "#b3261e", INK, 1);
+    PP(c, `M${cx + r * 0.05},${cy - r * 1.4} L${cx + r * 0.3},${cy - r * 1.15} L${cx + r * 0.05},${cy - r * 0.9} L${cx - r * 0.2},${cy - r * 1.15} Z`, GOLD, GOLD_D, 0.8);
+    PP(c, `M${cx},${cy - r * 0.52} L${cx + r * 1.5},${cy - r * 0.45} L${cx + r * 1.4},${cy - r * 0.32} L${cx},${cy - r * 0.38} Z`, "#101014", INK, 1);
+  } else if (hat === "tricorn") {
+    PP(c, `M${cx - r * 1.5},${cy - r * 0.45} L${cx - r * 0.9},${cy - r * 1.35} C${cx - r * 0.2},${cy - r * 1.7} ${cx + r * 0.6},${cy - r * 1.6} ${cx + r * 1.0},${cy - r * 1.3} L${cx + r * 1.6},${cy - r * 0.45} C${cx + r * 0.8},${cy - r * 0.8} ${cx - r * 0.8},${cy - r * 0.8} ${cx - r * 1.5},${cy - r * 0.45} Z`, "#1b1b1f", INK, 1.4);
+    PP(c, `M${cx - r * 1.45},${cy - r * 0.48} C${cx - r * 0.8},${cy - r * 0.8} ${cx + r * 0.8},${cy - r * 0.8} ${cx + r * 1.55},${cy - r * 0.48}`, null, "#f1ecdc", 1.6);
+    disc(c, cx + r * 0.1, cy - r * 1.1, r * 0.2, hp ? "#8fcff0" : "#c0392b", INK, 0.8);
+  } else if (hat === "gaucho") {
+    PP(c, `M${cx - r * 1.8},${cy - r * 0.55} C${cx - r * 1.2},${cy - r * 0.95} ${cx + r * 1.2},${cy - r * 0.95} ${cx + r * 1.8},${cy - r * 0.55} C${cx + r * 1.0},${cy - r * 0.3} ${cx - r * 1.0},${cy - r * 0.3} ${cx - r * 1.8},${cy - r * 0.55} Z`, "#1a1a1e", INK, 1.4);
+    PP(c, `M${cx - r * 0.85},${cy - r * 0.62} C${cx - r * 0.85},${cy - r * 1.55} ${cx + r * 0.85},${cy - r * 1.55} ${cx + r * 0.85},${cy - r * 0.62} Z`, "#26262c", INK, 1.4);
+    PP(c, `M${cx - r * 0.85},${cy - r * 0.78} L${cx + r * 0.85},${cy - r * 0.78}`, null, "#8a1c14", 2.2);
+  } else if (hat === "cap") {
+    PP(c, `M${cx - r * 1.1},${cy - r * 0.5} C${cx - r * 1.1},${cy - r * 1.7} ${cx + r * 1.1},${cy - r * 1.7} ${cx + r * 1.1},${cy - r * 0.5} Z`, "#202026", INK, 1.4);
+    disc(c, cx, cy - r * 1.55, r * 0.22, "#c0392b", INK, 0.8);
+  }
+}
+function bigSoldierBody(c, u, coat, belts, scale) {                // torso de infanteria (hacia la derecha)
+  const coatD = dk(coat, 0.68);
+  PP(c, "M-17,-66 C-20,-108 -14,-124 0,-126 C14,-124 20,-108 18,-66 Z", coat, INK, 1.6);
+  PP(c, "M8,-124 C16,-118 20,-100 18,-66 L8,-66 C10,-90 10,-108 8,-124 Z", coatD, null, 0, 0.5);
+  if (belts) { PP(c, "M-14,-118 L-6,-120 L18,-74 L8,-72 Z", "#f4f0e4", INK, 1); PP(c, "M14,-118 L6,-120 L-18,-74 L-8,-72 Z", "#e2ddcc", INK, 1); }
+  PP(c, "M-18,-72 L18,-72 L18,-64 L-18,-64 Z", "#2a2420", INK, 1); disc(c, 0, -68, 3.4, GOLD, GOLD_D, 0.8);
+  PP(c, "M-9,-126 L9,-126 L8,-118 L-8,-118 Z", u.team === "p" ? "#b3261e" : "#efe6c8", INK, 1);
+  for (const by of [-112, -100]) disc(c, 1, by, 1.8, GOLD, GOLD_D, 0.5);
+}
+function bigCav(c, u, t, wt) {
+  const p = u.team === "p", coat = unitCoat(u);
+  const horse = u.id === 1 ? "#eee9dc" : ["#7a4a26", "#5a3820", "#8d8a86", "#6b4423"][u.id % 4], hd = dk(horse, 0.68), mane = u.id === 1 ? "#b8b0a0" : "#1e140c";
+  c.translate(0, Math.sin(t / 260) * 1.5);
+  c.fillStyle = "rgba(0,0,0,.3)"; c.beginPath(); c.ellipse(0, 2, 64, 8, 0, 0, 7); c.fill();
+  const leg = (x, k, col) => {
+    PP(c, `M${x - 6},-58 C${x - 7},-42 ${x - 5 + k},-30 ${x - 4 + k},-8 L${x + 4 + k},-8 C${x + 4 + k},-30 ${x + 7},-42 ${x + 7},-58 Z`, col, INK, 1.4);
+    PP(c, `M${x - 4.6 + k},-8 L${x + 4.6 + k},-8 L${x + 5.8 + k},0 L${x - 5.8 + k},0 Z`, "#1c1410", INK, 1);
+  };
+  PP(c, "M-48,-74 C-74,-72 -82,-44 -72,-24 C-67,-40 -60,-56 -45,-62 Z", mane, INK, 1.5);
+  leg(-24, 5, hd); leg(40, -4, hd);
+  PP(c, "M-54,-68 C-54,-90 -30,-95 0,-95 C28,-95 50,-93 55,-74 C57,-56 40,-47 10,-46 C-22,-45 -54,-48 -54,-68 Z", horse, INK, 1.7);
+  PP(c, "M-40,-52 C-20,-44 20,-44 44,-54 C30,-46 -10,-40 -40,-52 Z", dk(horse, 0.6), null, 0, 0.5);
+  PP(c, "M-30,-90 C-10,-94 20,-94 40,-88", null, "#ffffff", 2, 0.25);
+  leg(-38, -3, horse); leg(28, 5, horse);
+  PP(c, "M34,-86 C46,-102 56,-118 66,-126 L86,-112 C80,-100 72,-82 58,-62 Z", horse, INK, 1.6);
+  PP(c, "M64,-128 C72,-136 86,-132 97,-114 C101,-106 97,-99 91,-99 C85,-101 79,-105 73,-111 C67,-113 62,-121 64,-128 Z", horse, INK, 1.6);
+  PP(c, "M69,-131 L67,-144 L76,-133 Z", horse, INK, 1.2); disc(c, 80, -119, 2.4, "#140c08"); disc(c, 95, -106, 1.5, "#3a2418");
+  PP(c, "M66,-129 C54,-118 46,-104 36,-88 C48,-92 58,-104 68,-116 Z", mane, INK, 1.2);
+  PP(c, "M74,-112 C80,-114 86,-112 92,-106", null, "#8a1c14", 1.8);
+  PP(c, "M-18,-96 L24,-96 L26,-68 L-20,-68 Z", dk(coat, 0.85), INK, 1.4); PP(c, "M-18,-72 L26,-72", null, "#f4f4f4", 2);
+  PP(c, "M-14,-98 C-8,-106 14,-106 22,-98 L20,-90 L-12,-90 Z", "#5a3a20", INK, 1.4);
+  PP(c, "M0,-98 C14,-96 18,-76 16,-52 L8,-50 C10,-68 6,-82 -4,-90 Z", "#1c1c24", INK, 1.4);
+  bigSoldierBody(c, u, coat, u.face !== "gaucho");
+  c.save(); c.translate(0, -26); c.scale(1, 1); c.restore();
+  if (u.id === 1 || u.id === 101) { PP(c, "M-14,-120 L-5,-123 L18,-82 L8,-80 Z", "#8fcff0", INK, 1); PP(c, "M-9,-118 L-5,-120 L12,-86 L9,-85 Z", "#ffffff", null); }
+  const hx = 26, hy = -112;
+  if (wt === "gun") {                                              // carabina apuntada hacia adelante
+    PP(c, `M4,-112 L30,-112 L30,-104 L4,-104 Z`, coat, INK, 1.3); disc(c, 31, -108, 5, SKIN[faceSpec(u).skin][0], INK, 1);
+    PP(c, "M-6,-104 L60,-112 L60,-106 L-6,-98 Z", "#6a4423", INK, 1.5); PP(c, "M58,-112 L98,-116 L98,-111 L58,-106 Z", "#8d96a0", INK, 1.2);
+  } else if (wt === "bola") {                                         // boleadoras girando
+    PP(c, "M6,-118 L28,-134 L30,-126 L8,-112 Z", coat, INK, 1.3); disc(c, 32, -132, 5, SKIN[faceSpec(u).skin][0], INK, 1);
+    for (let i = 0; i < 3; i++) { const a = t / 90 + i * 2.094, bx = 36 + Math.cos(a) * 30, by = -152 + Math.sin(a) * 14; PP(c, "M34,-136 L" + bx + "," + by, null, "#5a3a20", 1.6); disc(c, bx, by, 5, "#3a2a1c", INK, 1.2); }
+  } else if (wt === "lance") {                                        // lanza de caballeria
+    PP(c, "M6,-112 L30,-114 L30,-106 L6,-104 Z", coat, INK, 1.3); disc(c, 31, -110, 5, SKIN[faceSpec(u).skin][0], INK, 1);
+    PP(c, "M-30,-100 L122,-124 L122,-118 L-30,-94 Z", "#6a4423", INK, 1.4); PP(c, "M121,-124 L152,-127 L121,-118 Z", "#dfe5ea", INK, 1.2);
+  } else {                                                            // sable en alto
+    PP(c, "M6,-118 L28,-130 L30,-122 L8,-110 Z", coat, INK, 1.3); disc(c, 32, -128, 5, SKIN[faceSpec(u).skin][0], INK, 1);
+    PP(c, "M34,-130 C52,-146 64,-166 76,-190", null, INK, 7); PP(c, "M34,-130 C52,-146 64,-166 76,-190", null, "#e6ebf0", 4);
+    PP(c, "M27,-138 L41,-122", null, GOLD, 3);
+  }
+  bigHead(c, u, 2, -140, 12, hatFor(u));
+}
+function bigInf(c, u, t, wt, noWeapon) {
+  const p = u.team === "p", coat = unitCoat(u);
+  c.translate(0, Math.sin(t / 300) * 1);
+  c.fillStyle = "rgba(0,0,0,.3)"; c.beginPath(); c.ellipse(0, 2, 40, 7, 0, 0, 7); c.fill();
+  PP(c, "M-14,-64 L-2,-64 L-4,-12 L-18,-12 Z", "#d8d3c2", INK, 1.5); PP(c, "M-18,-12 L-4,-12 L-4,-2 L-20,-2 Z", "#15151a", INK, 1.2);
+  PP(c, "M2,-64 L16,-64 L26,-12 L12,-10 Z", "#e6e1d0", INK, 1.5); PP(c, "M12,-12 L26,-14 L30,-2 L14,-2 Z", "#15151a", INK, 1.2);
+  bigSoldierBody(c, u, coat, u.face !== "gaucho");
+  if (!noWeapon) {
+    if (wt === "axe") {                                             // machete
+      PP(c, "M6,-104 L26,-98 L24,-90 L4,-96 Z", coat, INK, 1.3); disc(c, 28, -96, 5.5, SKIN[faceSpec(u).skin][0], INK, 1);
+      PP(c, "M28,-98 C40,-120 52,-134 64,-138 C66,-124 54,-108 34,-92 Z", "#cfd6dc", INK, 1.5); PP(c, "M28,-96 L38,-86", null, "#4a3320", 5);
+    } else if (wt === "gun") {                                      // fusil apuntado
+      PP(c, "M6,-108 L30,-106 L30,-98 L6,-100 Z", coat, INK, 1.3); disc(c, 31, -102, 5.5, SKIN[faceSpec(u).skin][0], INK, 1);
+      PP(c, "M-14,-112 L62,-108 L62,-100 L-14,-102 Z", "#6a4423", INK, 1.6); PP(c, "M60,-108 L104,-106 L104,-101 L60,-100 Z", "#8d96a0", INK, 1.2);
+    } else {                                                        // bayoneta
+      PP(c, "M6,-100 L30,-92 L28,-84 L4,-92 Z", coat, INK, 1.3); disc(c, 31, -90, 5.5, SKIN[faceSpec(u).skin][0], INK, 1);
+      PP(c, "M-20,-82 L62,-100 L64,-92 L-18,-74 Z", "#6a4423", INK, 1.6); PP(c, "M62,-100 L110,-111 L64,-92 Z", "#dfe5ea", INK, 1.3);
+    }
+  } else PP(c, "M6,-104 L20,-80 L12,-76 L0,-98 Z", coat, INK, 1.3);
+  bigHead(c, u, 2, -142, 13, hatFor(u));
+}
+function bigArt(c, u, t) {
+  c.fillStyle = "rgba(0,0,0,.3)"; c.beginPath(); c.ellipse(0, 2, 70, 8, 0, 0, 7); c.fill();
+  PP(c, "M-6,-36 L-78,-6 L-72,2 L4,-26 Z", "#6a4423", INK, 1.6);
+  c.save(); c.translate(-4, -56); c.rotate(-0.17);
+  PP(c, "M-18,-10 L82,-8 L86,-14 L88,0 L86,12 L82,8 L-18,10 C-26,8 -26,-8 -18,-10 Z", "#2e2e34", INK, 1.8);
+  PP(c, "M-10,-9 L78,-7", null, "#7a7a84", 2, 0.8); PP(c, "M40,-9 L40,9 M70,-8 L70,8", null, "#15151a", 2.4);
+  disc(c, -26, 0, 5, "#2e2e34", INK, 1.4); c.restore();
+  disc(c, -4, -30, 31, "#6a4423", INK, 2); disc(c, -4, -30, 25, null, "#2a2420", 4);
+  for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; PP(c, `M${-4 + Math.cos(a) * 6},${-30 + Math.sin(a) * 6} L${-4 + Math.cos(a) * 26},${-30 + Math.sin(a) * 26}`, null, "#8a5a30", 3); }
+  disc(c, -4, -30, 6, "#8a6a2a", INK, 1.3);
+  c.save(); c.translate(-76, 0); c.scale(0.9, 0.9); bigInf(c, Object.assign({}, u, { cls: "inf" }), t, "none", true); c.restore();
+}
+function drawBigUnit(u, t, wt) {
+  c_ = ctx; ctx.save();
+  if (u.flash > 0 && u.flash % 4 < 2) ctx.globalAlpha *= 0.45;
+  if (u.cls === "cav") bigCav(ctx, u, t, wt); else if (u.cls === "inf") bigInf(ctx, u, t, wt); else bigArt(ctx, u, t);
+  ctx.restore();
+}
+function muzzlePos(u, wt) { return wt === "bola" ? [60, -150] : u.cls === "art" ? [80, -71] : u.cls === "cav" ? [98, -114] : [104, -104]; }
+var c_ = null;
+
+// ================= ESCENOGRAFIA: EL SACRIFICIO DEL SARGENTO CABRAL =================
+// ph 0: el caballo de San Martin cae y un realista avanza | ph 1: Cabral llega al galope | ph 2: el golpe | ph 3: Cabral herido
+function drawCabral(t, rel, ph) {
+  const cab = units.find(u => u.id === 4), sm = units.find(u => u.id === 1), foe = units.find(u => u.id === 11);
+  const G = 268;
+  ctx.save(); ctx.translate(320, G); ctx.scale(1.18, 1.18); ctx.translate(-320, -G);
+  for (let i = 0; i < 8; i++) { const a = (t / 1100 + i * 0.37) % 1; disc(ctx, 70 + i * 70 + Math.sin(t / 500 + i) * 6, G - 4 - a * 30, 9 + a * 16, "rgba(214,194,150," + (0.34 * (1 - a)).toFixed(2) + ")"); }
+  // San Martin, aprisionado: torso asomando tras el caballo
+  ctx.save(); ctx.translate(268, G - 30); ctx.rotate(-0.3);
+  PP(ctx, "M-17,4 C-19,-34 -13,-52 0,-54 C13,-52 19,-34 17,4 Z", "#2d5aa8", INK, 1.8);
+  PP(ctx, "M-13,-48 L-5,-50 L16,-8 L6,-6 Z", "#8fcff0", INK, 1); PP(ctx, "M-8,-9 L-5,-48", null, "#ffffff", 1.2, 0);
+  PP(ctx, "M-9,-54 L9,-54 L8,-46 L-8,-46 Z", "#b3261e", INK, 1);
+  PP(ctx, "M8,-46 L34,-66 L40,-58 L14,-36 Z", "#2d5aa8", INK, 1.6); disc(ctx, 39, -62, 5.5, SKIN.tan[0], INK, 1.2);
+  bigHead(ctx, sm, 3, -70, 13, "bicorne");
+  ctx.restore();
+  // caballo blanco caido
+  ctx.save(); ctx.translate(228, G - 6);
+  ctx.fillStyle = "rgba(0,0,0,.3)"; ctx.beginPath(); ctx.ellipse(0, 6, 92, 9, 0, 0, 7); ctx.fill();
+  for (const [x, y, ex, ey] of [[58, -26, 112, -46], [66, -18, 118, -28], [-30, -4, 24, 8], [-18, 2, 36, 14]]) {
+    PP(ctx, "M" + x + "," + y + " L" + ex + "," + ey + " L" + (ex + 3) + "," + (ey + 7) + " L" + (x + 2) + "," + (y + 12) + " Z", "#e2ddd0", INK, 1.5);
+    disc(ctx, ex + 2, ey + 3, 4.5, "#1c1410");
+  }
+  PP(ctx, "M-76,-4 C-76,-42 -32,-56 10,-54 C54,-52 82,-34 80,-4 C74,13 -22,18 -76,-4 Z", "#f1ede0", INK, 2.2);
+  PP(ctx, "M-70,2 C-30,14 40,12 76,0 C70,12 -20,18 -70,2 Z", "#cfc9b8", null, 0, 0.7);
+  PP(ctx, "M-16,-54 C-9,-63 24,-63 32,-54 L28,-43 L-12,-43 Z", "#5a3a20", INK, 1.6);
+  PP(ctx, "M-74,-12 C-102,-12 -122,2 -118,16 C-110,25 -86,21 -70,8 Z", "#f1ede0", INK, 2);
+  PP(ctx, "M-110,6 L-102,10", null, INK, 2); PP(ctx, "M-94,-10 L-98,-24 L-86,-14 Z", "#f1ede0", INK, 1.4);
+  PP(ctx, "M-70,-14 C-50,-34 -30,-46 -8,-50", null, "#b8b0a0", 5);
+  ctx.restore();
+  // soldado realista de la bayoneta
+  let ex = 452, ang = 0, alpha = 1;
+  if (ph === 0) ex = 570 - Math.min(rel, 3200) * 0.037;
+  else if (ph === 1) ex = 453 + Math.sin(rel / 120) * 2;
+  else if (ph === 2) { const k = Math.max(0, Math.min(1, (rel - 450) / 750)); ang = k * 1.5; alpha = 1 - Math.max(0, (rel - 1100) / 800); }
+  else alpha = 0;
+  if (alpha > 0) { ctx.save(); ctx.globalAlpha = alpha; ctx.translate(ex + ang * 18, G); ctx.rotate(ang); ctx.scale(-0.8, 0.8); bigInf(ctx, foe, t, "lance"); ctx.restore(); }
+  // Cabral al galope
+  let cx = -240, y = 0, tilt = 0;
+  if (ph === 1) { cx = -150 + 458 * Math.min(1, rel / 1900); y = Math.abs(Math.sin(rel / 85)) * -5; }
+  else if (ph >= 2) cx = 308;
+  if (ph === 2 && rel > 450) tilt = Math.min(0.1, (rel - 450) / 4000);
+  if (ph >= 3) tilt = 0.1;
+  ctx.save(); ctx.translate(cx, G + y); ctx.rotate(tilt); ctx.scale(0.8, 0.8); LWMUL = 1;
+  bigCav(ctx, cab, ph === 1 ? t * 2.4 : t, "sword");
+  if (ph >= 3 || (ph === 2 && rel > 700)) disc(ctx, 6, -108, 6, "rgba(168,24,24,.85)");
+  ctx.restore();
+  if (ph === 2 && rel > 300 && rel < 700) {                                      // destello del sablazo
+    const a = 1 - (rel - 300) / 400; ctx.strokeStyle = "rgba(255,255,255," + a.toFixed(2) + ")"; ctx.lineWidth = 7; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.arc(cx + 95, G - 128, 52, -1.3, 0.7); ctx.stroke(); ctx.lineCap = "butt";
+  }
+  ctx.restore();
+}
+
+// ================= FONDOS DE ESCENA =================
+function drawBackdrop(kind, t, rel, ph) {
+  if (kind === "cabral") { drawBackdrop("campo", t); drawCabral(t, rel || 0, ph || 0); return; }
+  if (kind === "carreras") { drawCarreras(t); return; }
+  if (kind === "langostas") { drawLangostas(t, rel || 0, ph || 0); return; }
+  if (kind === "andes") { drawAndes(t); return; }
+  if (kind === "chacabuco") { drawChacabuco(t); return; }
+  if (kind === "maipu") { drawMaipu(t); return; }
+  if (kind === "abrazo") { drawAbrazo(t, rel || 0, ph || 0); return; }
+  const W2 = 640, H2 = 440;
+  if (kind === "convento") {                                      // noche
+    const g = ctx.createLinearGradient(0, 0, 0, 300); g.addColorStop(0, "#080c26"); g.addColorStop(1, "#3b2d5e");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W2, H2);
+    for (let i = 0; i < 70; i++) { ctx.globalAlpha = 0.4 + 0.6 * Math.abs(Math.sin(t / 700 + i)); ctx.fillStyle = "#fff6d8"; ctx.fillRect(rnd(i, 3, 1) * W2, rnd(i, 7, 2) * 170, 2, 2); }
+    ctx.globalAlpha = 1; disc(ctx, 520, 70, 26, "#f3ecc8"); disc(ctx, 510, 64, 24, "#080c26", null); disc(ctx, 520, 70, 30, "rgba(243,236,200,.12)");
+    ctx.fillStyle = "#1b2b2e"; for (let x = -10; x < W2 + 20; x += 20) ctx.fillRect(x, 232 - Math.round(16 * Math.abs(Math.sin(x / 80))), 22, 80);
+    // convento
+    ctx.fillStyle = "#4c4a6a"; ctx.fillRect(130, 160, 270, 110); ctx.fillStyle = "#5e3a48"; ctx.fillRect(122, 148, 286, 18);
+    ctx.fillStyle = "#3a3852"; ctx.fillRect(130, 250, 270, 20);
+    ctx.fillStyle = "#4c4a6a"; ctx.fillRect(412, 96, 52, 174); ctx.fillStyle = "#5e3a48"; ctx.fillRect(406, 84, 64, 16);
+    PP(ctx, "M410,84 L438,52 L466,84 Z", "#5e3a48", null); ctx.fillStyle = "#c8b890"; ctx.fillRect(436, 36, 4, 22); ctx.fillRect(430, 42, 16, 4);
+    ctx.fillStyle = "#14142a"; ctx.fillRect(428, 110, 20, 34);
+    for (let i = 0; i < 6; i++) {
+      const x = 146 + i * 42, flick = 0.82 + 0.18 * Math.sin(t / 180 + i * 2);
+      ctx.fillStyle = "rgba(255,214,107," + flick + ")"; PP(ctx, `M${x},214 L${x},188 C${x},176 ${x + 18},176 ${x + 18},188 L${x + 18},214 Z`, "rgba(255,214,107," + flick + ")", null);
+    }
+    ctx.fillStyle = "#2a2a40"; ctx.fillRect(238, 224, 28, 46); PP(ctx, "M238,226 C238,212 266,212 266,226 Z", "#2a2a40", null);
+    ctx.fillStyle = "#1b3a2a"; ctx.fillRect(0, 262, W2, 180);
+    ctx.fillStyle = "#15301f"; for (let i = 0; i < 24; i++) ctx.fillRect(rnd(i, 1, 5) * W2, 270 + rnd(i, 2, 6) * 30, 8, 3);
+    for (const tx of [40, 110, 520, 590]) { ctx.fillStyle = "#0f2a1a"; ctx.fillRect(tx, 190, 10, 80); disc(ctx, tx + 5, 180, 34, "#0f2a1a"); }
+    ctx.fillStyle = "rgba(10,12,40,.28)"; ctx.fillRect(0, 0, W2, H2);
+  } else if (kind === "amanecer") {                               // amanecer sobre el Parana
+    const g = ctx.createLinearGradient(0, 0, 0, 240); g.addColorStop(0, "#22305f"); g.addColorStop(0.55, "#d9795a"); g.addColorStop(1, "#f7c77c");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W2, H2);
+    const sg = ctx.createRadialGradient(470, 230, 10, 470, 230, 190); sg.addColorStop(0, "rgba(255,240,180,.95)"); sg.addColorStop(0.3, "rgba(255,200,120,.5)"); sg.addColorStop(1, "rgba(255,180,100,0)");
+    ctx.fillStyle = sg; ctx.fillRect(0, 0, W2, 300); disc(ctx, 470, 232, 40, "#fff4c8");
+    ctx.fillStyle = "rgba(255,220,180,.25)"; for (let i = 0; i < 5; i++) ctx.fillRect(40 + i * 130 + Math.sin(t / 2000 + i) * 12, 70 + i * 22, 90, 8);
+    const rg = ctx.createLinearGradient(0, 232, 0, 300); rg.addColorStop(0, "#f0b27a"); rg.addColorStop(1, "#3a5a86");
+    ctx.fillStyle = rg; ctx.fillRect(0, 232, W2, 80);
+    ctx.fillStyle = "rgba(255,240,200,.45)"; for (let i = 0; i < 12; i++) ctx.fillRect(440 + Math.sin(t / 400 + i) * 14 - i * 3, 238 + i * 5, 50 - i * 2, 2);
+    for (const [sx, sy, sc] of [[300, 238, 1], [380, 244, 0.8], [210, 242, 0.9]]) {                 // barcos realistas
+      ctx.save(); ctx.translate(sx, sy + Math.sin(t / 700 + sx) * 1.5); ctx.scale(sc, sc);
+      PP(ctx, "M-34,0 L34,0 L26,12 L-26,12 Z", "#2a1a14", null); ctx.fillStyle = "#2a1a14"; ctx.fillRect(-2, -56, 3, 56); ctx.fillRect(-18, -44, 2, 44); ctx.fillRect(14, -44, 2, 44);
+      PP(ctx, "M-16,-52 L0,-52 L0,-14 L-16,-14 Z", "#f1e3c0", null); PP(ctx, "M3,-52 L18,-52 L18,-14 L3,-14 Z", "#e8d6aa", null); ctx.restore();
+    }
+    ctx.fillStyle = "#4a6a30"; PP(ctx, "M0,300 L0,262 C80,252 160,262 240,282 L300,312 L0,312 Z", "#4a6a30", null);
+    ctx.fillStyle = "#35501f"; ctx.fillRect(0, 300, W2, 140);
+    ctx.fillStyle = "#2a4218"; for (let i = 0; i < 30; i++) ctx.fillRect(rnd(i, 4, 8) * W2, 305 + rnd(i, 5, 9) * 70, 10, 3);
+  } else {                                                        // campo de batalla (dia)
+    const g = ctx.createLinearGradient(0, 0, 0, 250); g.addColorStop(0, "#8fc0ea"); g.addColorStop(1, "#e8f1f2");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W2, H2);
+    for (let i = 0; i < 5; i++) { ctx.fillStyle = "rgba(90,86,84," + (0.5 - i * 0.07) + ")"; disc(ctx, 100 + i * 110 + Math.sin(t / 1200 + i) * 8, 190 - (i % 2) * 24, 60 - i * 4, "rgba(90,86,84," + (0.4 - i * 0.05) + ")"); }
+    ctx.fillStyle = "#b9d6a0"; for (let x = -20; x < 660; x += 20) ctx.fillRect(x, 226 - Math.round(18 * Math.abs(Math.sin(x / 90))), 20, 90);
+    ctx.fillStyle = "#6f9a44"; ctx.fillRect(0, 262, W2, 180); ctx.fillStyle = "#5c8638"; for (let i = 0; i < 30; i++) ctx.fillRect(rnd(i, 4, 8) * W2, 270 + rnd(i, 5, 9) * 60, 10, 3);
+    PP(ctx, "M0,300 L640,296 L640,310 L0,314 Z", "rgba(60,40,20,.25)", null);
+  }
+}
+
+// ================= DIALOGOS (estilo Fire Emblem) =================
+const SPK = {
+  sm:  { unit: 1,  name: "José de San Martín" },
+  ber: { unit: 2,  name: "Cap. Bermúdez" },
+  esc: { unit: 3,  name: "Cap. Escalada" },
+  cab: { unit: 4,  name: "Sgto. Cabral" },
+  zab: { unit: 17, name: "Cmdte. Zabala" }
+};
+const INTRO = [
+  { bg: "convento", cap: "Convento de San Carlos, San Lorenzo. Noche del 2 de febrero de 1813." },
+  { who: "esc", side: "L", mood: "serious", text: "Mi coronel, los vigías lo confirman: once barcos realistas fondearon frente a la barranca. Están desembarcando cañones." },
+  { who: "sm",  side: "R", mood: "serious", text: "Que desembarquen. Mientras no nos vean, la ventaja es nuestra. Que ningún hombre asome tras estos muros hasta que yo lo ordene." },
+  { who: "ber", side: "L", mood: "sad",     text: "Son más de doscientos, coronel, y nosotros apenas llegamos a ciento veinte..." },
+  { who: "sm",  side: "R", mood: "angry",   text: "Por eso no les daremos tiempo de formar. Dos columnas a la carga, al amanecer: una conmigo, la otra a su mando, capitán Bermúdez." },
+  { who: "ber", side: "L", mood: "smile",   text: "A sus órdenes. Mis hombres no fallarán." },
+  { who: "cab", side: "L", mood: "serious", text: "Mi coronel... Soy correntino y vine a pelear por esta tierra. Mañana la defiendo con el sable." },
+  { who: "sm",  side: "R", mood: "smile",   text: "Eso quería oír, sargento. Granaderos: sable en mano y al galope. ¡A mi señal!" },
+  { bg: "amanecer", cap: "Al amanecer, sobre la barranca del Paraná..." },
+  { who: "zab", side: "R", mood: "angry",   text: "¡Rápido con los cañones! Ese convento está vacío: los rebeldes no se atreverán a salir." },
+  { who: "zab", side: "R", mood: "smile",   text: "Formen en columna y avancen sobre el monasterio. Antes del mediodía, San Lorenzo será nuestro." },
+  { who: "sm",  side: "L", mood: "angry",   text: "¡Granaderos! ¡A la carga!" }
+];
+const EPILOGUE = [
+  { bg: "cabral", ph: 0, cap: "En pleno combate, el caballo de San Mart\u00edn cae herido de muerte y lo deja aprisionado contra el suelo..." },
+  { ph: 1, cap: "Un soldado realista se abalanza sobre \u00e9l con la bayoneta. Pero el sargento Juan Bautista Cabral lo ha visto..." },
+  { ph: 2, cap: "Cabral se interpone: derriba al enemigo con su sable... y recibe una herida mortal." },
+  { ph: 3, who: "sm",  side: "L", mood: "sad",     text: "\u00a1Sargento Cabral! Me ha salvado la vida... \u00a1Un cirujano, r\u00e1pido!" },
+  { who: "cab", side: "R", mood: "sad",     text: "No hace falta, mi coronel... Muero contento: hemos batido al enemigo." },
+  { who: "sm",  side: "L", mood: "serious", text: "Su nombre vivir\u00e1 en cada granadero que cabalgue por esta tierra." },
+  { bg: "campo", who: "esc", side: "R", mood: "smile",   text: "\u00a1Los realistas huyen hacia sus barcos, mi coronel! San Lorenzo es nuestro." },
+  { who: "sm",  side: "L", mood: "serious", text: "Esta fue la primera. La libertad de Am\u00e9rica reci\u00e9n empieza." }
+];
+let dlg = null;
+function startDialogue(lines, done) {
+  dlg = { lines, i: 0, chars: 0, done, bg: lines[0].bg || "convento", L: null, R: null, mood: { L: "neutral", R: "neutral" }, speaker: null, side: "L", last: performance.now(), lastTick: 0, lineStart: performance.now(), ph: 0 };
+  dlgApply();
+}
+function dlgApply() {
+  const ln = dlg.lines[dlg.i]; dlg.chars = 0; dlg.lineStart = performance.now(); if (ln.ph !== undefined) dlg.ph = ln.ph;
+  if (ln.bg && ln.bg !== dlg.bg) { dlg.bg = ln.bg; dlg.L = dlg.R = null; }
+  if (ln.who) { dlg[ln.side] = ln.who; dlg.mood[ln.side] = ln.mood || "neutral"; dlg.speaker = ln.who; dlg.side = ln.side; } else dlg.speaker = null;
+}
+function dlgAdvance() {
+  const ln = dlg.lines[dlg.i], full = (ln.text || ln.cap).length;
+  if (dlg.chars < full) { dlg.chars = full; return; }
+  if (++dlg.i >= dlg.lines.length) { dlgEnd(); return; }
+  Snd.sfx("blip"); dlgApply();
+}
+function dlgEnd() { const d = dlg.done; dlg = null; if (d) d(); }
+function wrapText(text, maxW) {
+  const words = text.split(" "), out = []; let line = "";
+  for (const w of words) { const test = line ? line + " " + w : w; if (ctx.measureText(test).width > maxW && line) { out.push(line); line = w; } else line = test; }
+  if (line) out.push(line); return out;
+}
+function drawDialogue(t) {
+  const d = dlg, ln = d.lines[d.i], full = ln.text || ln.cap;
+  drawBackdrop(d.bg, t, performance.now() - d.lineStart, d.ph);
+  const dt = Math.min(60, t - d.last); d.last = t;
+  if (d.chars < full.length) { d.chars = Math.min(full.length, d.chars + dt * 0.055); const k = Math.floor(d.chars / 2); if (k !== d.lastTick) { d.lastTick = k; if (ln.who) Snd.sfx("text"); } }
+  for (const side of ["L", "R"]) {                                   // retratos grandes
+    const key = d[side]; if (!key) continue;
+    const u = unitForSpeaker(SPK[key].unit), talking = d.speaker === key && d.side === side;
+    const big = !["cabral", "langostas", "abrazo", "andes"].includes(d.bg), S = big ? 214 : 124, x = side === "L" ? (big ? 26 : 12) : 640 - (big ? 26 : 12) - S, y = (big ? 84 : 172) + (talking ? Math.sin(t / 240) * 1.5 - 6 : 4);
+    ctx.fillStyle = "rgba(0,0,0,.45)"; ctx.fillRect(x + 8, y + 10, S, S);
+    drawPortrait(ctx, u, x, y, S, d.mood[side]);
+    ctx.strokeStyle = talking ? "#e8c872" : "#8a7a52"; ctx.lineWidth = talking ? 5 : 3; ctx.strokeRect(x, y, S, S);
+    if (!talking) { ctx.fillStyle = "rgba(10,10,24,.45)"; ctx.fillRect(x, y, S, S); }
+  }
+  // cuadro de texto
+  const bx = 14, by = 304, bw = 612, bh = 124;
+  const g = ctx.createLinearGradient(0, by, 0, by + bh); g.addColorStop(0, "rgba(22,32,72,.96)"); g.addColorStop(1, "rgba(10,14,36,.96)");
+  ctx.fillStyle = g; ctx.fillRect(bx, by, bw, bh);
+  ctx.strokeStyle = "#e8c872"; ctx.lineWidth = 3; ctx.strokeRect(bx + 1.5, by + 1.5, bw - 3, bh - 3);
+  ctx.strokeStyle = "rgba(232,200,114,.4)"; ctx.lineWidth = 1; ctx.strokeRect(bx + 7, by + 7, bw - 14, bh - 14);
+  if (ln.who) {
+    const name = SPK[ln.who].name; ctx.font = "bold 17px Georgia"; const nw = ctx.measureText(name).width + 34;
+    const nx = ln.side === "L" ? bx + 18 : bx + bw - 18 - nw;
+    ctx.fillStyle = "#1d3a68"; ctx.fillRect(nx, by - 15, nw, 28); ctx.strokeStyle = "#e8c872"; ctx.lineWidth = 2; ctx.strokeRect(nx + 1, by - 14, nw - 2, 26);
+    ctx.fillStyle = "#ffe9a8"; ctx.textAlign = "center"; ctx.fillText(name, nx + nw / 2, by + 5);
+  }
+  ctx.textAlign = "left";
+  ctx.font = ln.cap ? "italic 19px Georgia" : "18px Georgia";
+  const lines = wrapText(full, bw - 56); let left = Math.floor(d.chars);
+  lines.forEach((l, i) => {
+    const part = l.slice(0, Math.max(0, left)); left -= l.length + 1;
+    ctx.fillStyle = ln.cap ? "#d8cfa8" : "#f6f0dc";
+    if (ln.cap) { ctx.textAlign = "center"; ctx.fillText(part, bx + bw / 2, by + 52 + i * 26); ctx.textAlign = "left"; }
+    else ctx.fillText(part, bx + 28, by + 40 + i * 26);
+  });
+  if (d.chars >= full.length && Math.floor(t / 400) % 2 === 0) { ctx.fillStyle = "#e8c872"; ctx.fillText("▼", bx + bw - 34, by + bh - 16); }
+  ctx.fillStyle = "rgba(0,0,0,.5)"; ctx.fillRect(546, 10, 86, 26); ctx.strokeStyle = "#8a7a52"; ctx.lineWidth = 1; ctx.strokeRect(546.5, 10.5, 85, 25);
+  ctx.font = "13px Georgia"; ctx.fillStyle = "#e8dcb0"; ctx.textAlign = "center"; ctx.fillText("Saltar ▶▶", 589, 28); ctx.textAlign = "left";
+}
+
+// ================= DIFICULTAD, AYUDA, AMENAZA Y EVENTOS DE BATALLA =================
+const DIFF = {
+  easy:   { label: "Fácil",   drop: [18, 19, 16], hpM: 0.8, strD: -1, pHp: 6 },
+  normal: { label: "Normal",       drop: [18,19],         hpM: 0.9, strD: 0,  pHp: 3 },
+  hard:   { label: "Difícil", drop: [],           hpM: 1,   strD: 0,  pHp: 0 }
+};
+let difficulty = "normal";
+function makeUnits() {
+  const D = (B.diff && (B.diff[difficulty] || B.diff.normal)) || DIFF.normal;
+  return B.units().filter(u => !D.drop.includes(u.id)).map(u => {
+    if (u.team === "e") { u.maxhp = u.hp = Math.round(u.maxhp * D.hpM); u.str += D.strD; } else { u.maxhp += D.pHp; u.hp += D.pHp; }
+    return u;
+  });
+}
+function diffUI() {
+  return "<div class='diff'>Dificultad: " + Object.keys(DIFF).map(k => "<button class='dbtn" + (k === difficulty ? " sel" : "") + "' data-d='" + k + "'>" + DIFF[k].label + "</button>").join("") + "</div>";
+}
+function bindDiff() {
+  $box.querySelectorAll(".dbtn").forEach(b => b.onclick = () => {
+    difficulty = b.dataset.d; $box.querySelectorAll(".dbtn").forEach(x => x.classList.toggle("sel", x === b));
+  });
+}
+
+// ----- instructivo -----
+const HELP_HTML =
+  "<h1>CÓMO SE JUEGA</h1><h3>Guía rápida de San Lorenzo</h3>" +
+  "<h2>Objetivo</h2><p>Derrota a todos los realistas. Pierdes si cae <b>tu líder</b> (marcado con la estrella dorada ★: San Martín o Belgrano) o si caen todas tus unidades.</p>" +
+  "<h2>Tu turno, paso a paso</h2><ol>" +
+  "<li><b>Clic en una unidad azul:</b> se marcan en azul las casillas adonde puede ir. El monte cuesta más movimiento.</li>" +
+  "<li><b>Clic en una casilla azul:</b> la unidad se mueve ahí (aun no ataca).</li>" +
+  "<li><b>Aparece el menú:</b> <i>Atacar</i> o <i>Esperar</i>. Si eliges Atacar y tienes dos armas útiles, eliges cuál usar.</li>" +
+  "<li><b>Los enemigos al alcance se marcan en rojo.</b> Pasa el mouse sobre uno para ver el pronóstico (daño, probabilidad de golpe, crítico, si ataca dos veces). Clic para atacar.</li>" +
+  "<li>Cuando todas tus unidades actuaron (o con <i>Terminar turno</i>) juegan los realistas.</li></ol>" +
+  "<p><b>Para volver atrás:</b> clic derecho, Esc, o clic fuera del menú. Una unidad que se movió y no atacó vuelve a su casilla si cancelas.</p>" +
+  "<h2>Dónde colocar tus unidades (consejos)</h2><ul>" +
+  "<li><b>Usa los montes (los árboles).</b> Dan +1 de defensa y +20 de esquive. Termina tu movimiento ahí cuando un enemigo pueda alcanzarte.</li>" +
+  "<li><b>Activa «Ver amenaza enemiga»</b> (botón o tecla T): pinta de rojo todas las casillas que los realistas pueden golpear en su próximo turno. Quédate fuera del rojo o entárate de cuánto riesgo corres.</li>" +
+  "<li><b>Deja que ellos vengan.</b> Tu caballería se mueve 5 casillas; la infantería enemiga, 3, y los cañones, 2. En el primer turno quédate fuera de su alcance: cuando avancen, golpeas tú primero y varios contra uno.</li>" +
+  "<li><b>Ataca en grupo.</b> Dos o tres unidades sobre el mismo enemigo lo eliminan antes de que contraataque. Un enemigo que muere no responde.</li>" +
+  "<li><b>Ve por los cañones con caballería.</b> Son débiles de cerca: a distancia 1 no pueden contraatacar.</li>" +
+  "<li><b>Protege a tu líder (★).</b> Es tu mejor unidad, pero si cae pierdes. Úsalo para rematar, no en primera línea.</li>" +
+  "<li><b>Las armas importan.</b> La bayoneta vence al sable: contra infantes con bayoneta usa la <i>carabina</i> a distancia 2 (ojo: el fusil enemigo también llega a 2). Contra los del machete, usa el <i>sable</i>.</li>" +
+  "<li>Mueve las unidades fuertes primero para despejar camino, y deja a las heridas atrás del grupo.</li></ul>" +
+  "<h2>Triángulo de armas</h2><p><b>Sable</b> vence a <b>Machete</b> · <b>Machete</b> vence a <b>Bayoneta</b> · <b>Bayoneta</b> vence a <b>Sable</b>. El que tiene ventaja suma +1 de poder y +15 de golpe (el otro, lo resta). Carabina, fusil y cañón no entran en el triángulo.</p>" +
+  "<h2>Estadísticas</h2><ul>" +
+  "<li><b>Fue</b> (Fuerza): daño. <b>Def</b>: reduce el daño recibido. <b>Hab</b> (Habilidad): más golpe y crítico. <b>Vel</b> (Velocidad): esquive y ataque doble. <b>Sue</b> (Suerte): esquive y evita críticos.</li>" +
+  "<li><b>Ataque doble:</b> si tu velocidad de ataque supera en 4 o más a la del rival, golpeas dos veces. Las armas pesadas reducen esa velocidad.</li>" +
+  "<li><b>Crítico:</b> triplica el daño. Las armas se gastan con cada golpe y se rompen al llegar a 0.</li></ul>" +
+  "<h2>Armas y alcance</h2><p>Sable, machete y bayoneta: alcance 1 (cuerpo a cuerpo). Carabina y fusil: alcance 2 (no pegan de cerca). Cañón: alcance 2 a 3 (muy potente, no pega de cerca).</p>" +
+  "<h2>Armas y terreno de Tucumán</h2><ul><li><b>Lanza</b>: alcance 1, vence al sable. <b>Facón</b>: espada corta y rápida. <b>Boleadoras</b>: alcance 2, poco daño, pero si aciertan el enemigo pierde 2 de movimiento en su turno.</li><li>El <b>sembrado</b> da +10 de esquive y cuesta más movimiento a la caballería. El agua es intransitable: solo se cruza por el vado.</li></ul>" +
+  "<h2>Cerros y refuerzos (Chacabuco y Maipú)</h2><ul><li>El <b>cerro</b> da +2 de defensa y +15 de esquive, pero cuesta más moverse. Los realistas lo ocupan: busca los pasos y rodéalo.</li><li>Algunas batallas traen <b>refuerzos</b> en un turno fijo (te lo avisa el consejo inicial): aparecen en el mapa y pueden actuar ese mismo turno.</li></ul>" +
+  "<h2>Otros controles</h2><ul>" +
+  "<li><b>Espacio / Enter / clic:</b> avanzar los diálogos. <b>Saltar:</b> botón arriba a la derecha.</li>" +
+  "<li><b>Clic durante un combate:</b> lo acelera. <b>H:</b> abre este instructivo. <b>T:</b> amenaza enemiga.</li>" +
+  "<li><b>Dificultad:</b> se elige al empezar o al reintentar. En <i>Fácil</i> hay menos enemigos y tus unidades tienen más vida.</li></ul>" +
+  "<p class='help'>Música: armonía de la Marcha de San Lorenzo. </p>";
+function openHelp() { document.getElementById("helpBody").innerHTML = HELP_HTML; document.getElementById("helpOv").classList.remove("hidden"); }
+function closeHelp() { document.getElementById("helpOv").classList.add("hidden"); }
+const helpOpen = () => !document.getElementById("helpOv").classList.contains("hidden");
+
+// ----- amenaza enemiga -----
+let showThreat = false, threatCache = { key: "", cells: [] };
+function threatCells() {
+  const key = alive().map(u => u.id + ":" + u.x + "," + u.y + ":" + u.hp).join("|");
+  if (key === threatCache.key) return threatCache.cells;
+  const set = new Map();
+  for (const e of alive().filter(u => u.team === "e")) {
+    for (const [k] of reachable(e)) {
+      const [x, y] = k.split(",").map(Number);
+      for (const w of usable(e)) for (let dy = -w.rmax; dy <= w.rmax; dy++) for (let dx = -w.rmax; dx <= w.rmax; dx++) {
+        const dd = Math.abs(dx) + Math.abs(dy); if (dd < w.rmin || dd > w.rmax) continue;
+        const nx = x + dx, ny = y + dy;
+        if (inMap(nx, ny) && MAP[ny][nx] !== "~" && MAP[ny][nx] !== "C") set.set(nx + "," + ny, { x: nx, y: ny });
+      }
+    }
+  }
+  threatCache = { key, cells: [...set.values()] };
+  return threatCache.cells;
+}
+function toggleThreat() {
+  showThreat = !showThreat;
+  document.getElementById("threatBtn").textContent = "Amenaza enemiga: " + (showThreat ? "ver (T)" : "oculta (T)");
+}
+
+// ----- gritos de batalla y eventos -----
+const CRIES = {
+  p: ["¡Viva la Patria!", "¡Libertad!", "¡Por la Patria!", "¡A ellos, granaderos!", "¡Viva la libertad!"],
+  e: ["¡Viva el Rey!", "¡Por España!", "¡Viva Fernando VII!", "¡Por el Rey y la fe!", "¡No pasarán!"]
+};
+const NAMED_CRY = { 1: "¡Por la libertad de América!", 2: "¡A la carga, granaderos!", 3: "¡Viva la Patria!", 4: "¡Por Corrientes y por la Patria!", 17: "¡Viva el Rey y España!" };
+function cryFor(u) {
+  if (u.cls === "art" && Math.random() < 0.6) return "¡Fuego!";
+  if (NAMED_CRY[u.id] && Math.random() < 0.7) return NAMED_CRY[u.id];
+  const l = CRIES[u.team]; return l[Math.floor(Math.random() * l.length)];
+}
+async function shoutsAt(a, d) {
+  for (const [u, prob] of [[a, 1], [d, 0.65]]) {
+    if (Math.random() > prob || !scene) continue;
+    scene.shout = { side: scene.left === u ? "L" : "R", text: cryFor(u) };
+    await tween(950, () => {});
+    if (scene) scene.shout = null;
+  }
+}
+function drawBubble(sh) {
+  ctx.font = "italic bold 16px Georgia";
+  const w = ctx.measureText(sh.text).width + 30, h = 34, cx = sh.side === "L" ? SC.lx : SC.rx;
+  const x = Math.max(8, Math.min(632 - w, cx - w / 2)), y = 24;
+  ctx.fillStyle = "#fffdf0"; ctx.strokeStyle = "#2a1e15"; ctx.lineWidth = 2.5;
+  ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, y, w, h, 10); else ctx.rect(x, y, w, h); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx - 9, y + h - 1); ctx.lineTo(cx, y + h + 15); ctx.lineTo(cx + 9, y + h - 1); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = "#fffdf0"; ctx.fillRect(cx - 8, y + h - 3, 16, 4);
+  ctx.fillStyle = "#2a1e15"; ctx.textAlign = "center"; ctx.fillText(sh.text, x + w / 2, y + 23); ctx.textAlign = "left";
+}
+const evFlags = { mid: false, duel: false };
+function playDialogue(lines) { return new Promise(res => startDialogue(lines, res)); }
+async function midEvent() {                      // cuando quedan 3 realistas o menos, el lider arenga
+  if (fastMode || evFlags.mid || !B.midLines) return;
+  const foes = alive().filter(u => u.team === "e"), lead = units.find(u => u.id === B.leaderId);
+  if (lead.hp <= 0 || foes.length === 0 || foes.length > 3) return;
+  evFlags.mid = true;
+  await playDialogue(B.midLines());
+}
+async function duelTalk(a, d) {                  // el lider frente a frente con el jefe enemigo
+  if (evFlags.duel || !B.duel) return;
+  const ids = [a.id, d.id];
+  if (!(ids.includes(B.duel.a) && ids.includes(B.duel.b))) return;
+  evFlags.duel = true;
+  await playDialogue(B.duel.lines);
+}
+
+// ================= SONIDO (opcional, sintetizado con Web Audio) =================
+// Armonia de la Marcha de San Lorenzo, segun los acordes de la nota del usuario (1 compas = 2 tiempos).
+// La nota no trae la melodia cantada: aqui suenan bajo, acordes, redoble y arpegios de clarin sobre la progresion real.
+const SONG_CHORDS = [
+  "Bb", "Eb", "Bb", "F", "F7",
+  "Bb", "Bb", "F7", "F7", "F7", "F7", "A", "Bb", "Bb", "Bb", "Eb", "Eb", "Ebm", "Bb", "F7", "F7", "Bb", "Bb",
+  "Gm", "D",
+  "F7", "Bb", "D7", "Gm", "Eb", "Bb", "F7", "Bb", "Eb", "Bb", "F7", "Bb",
+  "Eb", "Bb", "D7", "Gm", "Eb", "Bb", "F7", "Bb", "Eb", "Bb", "F7", "Bb",
+  "Bb",
+  "Eb", "Eb", "Ab", "Eb", "Bb", "Eb", "F7", "Bb", "Eb", "Eb", "Ebsus2", "Cm", "Ab", "Eb", "Bb", "Eb"
+];
+function midiF(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+function parseChord(name) {
+  const m = /^([A-G])(b?)(m|7|sus2)?$/.exec(name), base = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[m[1]];
+  const semi = (base + (m[2] ? 11 : 0)) % 12, q = m[3] || "";
+  return { semi, iv: q === "m" ? [0, 3, 7] : q === "7" ? [0, 4, 7, 10] : q === "sus2" ? [0, 2, 7] : [0, 4, 7] };
+}
+function noteFreq(n) {
+  const m = /^([A-G])(#?)(\d)$/.exec(n); if (!m) return 0;
+  const semi = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[m[1]] + (m[2] ? 1 : 0) + (parseInt(m[3]) + 1) * 12;
+  return 440 * Math.pow(2, (semi - 69) / 12);
+}
+const Snd = {
+  on: false, ac: null, out: null, evs: null, ptr: 0, loopStart: 0, timer: null, BPM: 116, loopBeats: 132, noiseBuf: null,
+  init() {
+    if (this.ac) return true;
+    const AC = (typeof window !== "undefined") && (window.AudioContext || window.webkitAudioContext);
+    if (!AC) return false;
+    this.ac = new AC(); this.out = this.ac.createGain(); this.out.gain.value = 0.5; this.out.connect(this.ac.destination);
+    const len = this.ac.sampleRate; this.noiseBuf = this.ac.createBuffer(1, len, this.ac.sampleRate);
+    const d = this.noiseBuf.getChannelData(0); for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    this.evs = [];
+    SONG_CHORDS.forEach((name, i) => {
+      const { semi, iv } = parseChord(name), t0 = i * 2, bass = 36 + semi;
+      this.evs.push({ t: t0, dur: .45, f: midiF(bass), k: "bass" }, { t: t0 + 1, dur: .45, f: midiF(bass + 7), k: "bass" });
+      let r = 48 + semi; while (r < 55) r += 12;
+      for (const o of [.5, 1.5]) for (const n of iv) this.evs.push({ t: t0 + o, dur: .3, f: midiF(r + n), k: "chord" });
+      [iv[0], iv[1], iv[2], iv[1]].forEach((n, j) => this.evs.push({ t: t0 + j * .5, dur: .42, f: midiF(r + 12 + n), k: "lead", v: i < 5 ? 0.085 : 0.045 }));
+      for (const [o, v] of [[0, .5], [.5, .25], [.75, .3], [1, .5], [1.5, .25]]) this.evs.push({ t: t0 + o, dur: .1, v, k: "snare" });
+    });
+    this.loopBeats = SONG_CHORDS.length * 2;
+    this.evs.sort((a, b) => a.t - b.t);
+    return true;
+  },
+  toggle() {
+    if (!this.on) {
+      if (!this.init()) { $snd.textContent = "Sonido no disponible"; return; }
+      this.on = true; this.ac.resume();
+      if (!this.timer) { this.loopStart = this.ac.currentTime + 0.1; this.ptr = 0; this.timer = setInterval(() => this.pump(), 100); }
+      $snd.textContent = "Sonido: encendido";
+    } else {
+      this.on = false; clearInterval(this.timer); this.timer = null; this.ac.suspend();
+      $snd.textContent = "Sonido: apagado";
+    }
+  },
+  tone(f, t, dur, type, vol, f2) {
+    const o = this.ac.createOscillator(), g = this.ac.createGain();
+    o.type = type; o.frequency.setValueAtTime(f, t); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(this.out); o.start(t); o.stop(t + dur + 0.02);
+  },
+  noise(t, dur, vol, ftype, freq) {
+    const s = this.ac.createBufferSource(), g = this.ac.createGain(), fl = this.ac.createBiquadFilter();
+    s.buffer = this.noiseBuf; fl.type = ftype; fl.frequency.value = freq;
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(fl); fl.connect(g); g.connect(this.out); s.start(t, Math.random() * 0.5); s.stop(t + dur + 0.02);
+  },
+  pump() {
+    const beat = 60 / this.BPM, ahead = this.ac.currentTime + 0.6;
+    for (;;) {
+      const ev = this.evs[this.ptr], t = this.loopStart + ev.t * beat;
+      if (t > ahead) break;
+      if (t >= this.ac.currentTime - 0.05) {
+        if (ev.k === "lead") this.tone(ev.f, t, ev.dur * beat * 0.92, "square", ev.v || 0.05);
+        else if (ev.k === "chord") this.tone(ev.f, t, ev.dur * beat, "square", 0.03);
+        else if (ev.k === "bass") this.tone(ev.f, t, ev.dur * beat, "triangle", 0.2);
+        else this.noise(t, 0.07, ev.v * 0.35, "highpass", 1800);
+      }
+      if (++this.ptr >= this.evs.length) { this.ptr = 0; this.loopStart += this.loopBeats * beat; }
+    }
+  },
+  sfx(name) {
+    if (!this.on || !this.ac) return;
+    const t = this.ac.currentTime + 0.01;
+    switch (name) {
+      case "blip":   this.tone(880, t, 0.06, "square", 0.08); break;
+      case "back":   this.tone(440, t, 0.07, "square", 0.08, 330); break;
+      case "hit":    this.noise(t, 0.14, 0.6, "lowpass", 1400); this.tone(160, t, 0.12, "sine", 0.5, 60); break;
+      case "crit":   this.noise(t, 0.25, 0.8, "lowpass", 2500); this.tone(110, t, 0.25, "sine", 0.7, 40); this.tone(1200, t, 0.18, "square", 0.1, 400); break;
+      case "miss":   this.noise(t, 0.2, 0.25, "highpass", 3000); break;
+      case "gun":    this.noise(t, 0.18, 0.7, "bandpass", 2200); this.tone(200, t, 0.1, "sine", 0.3, 80); break;
+      case "cannon": this.noise(t, 0.55, 0.9, "lowpass", 500); this.tone(95, t, 0.5, "sine", 0.9, 28); break;
+      case "die":    this.tone(440, t, 0.4, "square", 0.08, 90); break;
+      case "text":   this.tone(280 + Math.random() * 90, t, 0.035, "square", 0.025); break;
+    }
+  }
+};
+
+// ================= BATALLA DE TUCUMAN: ARMAS, PERSONAJES Y ESCENAS =================
+// ----- armas nuevas, movimiento y langostas -----
+Object.assign(WEAPONS, {
+  lanza:      { name: "Lanza",      type: "lance", mt: 7, hit: 80, crit: 0, wt: 8, rmin: 1, rmax: 1, uses: 35 },
+  boleadoras: { name: "Boleadoras", type: "bola",  mt: 3, hit: 75, crit: 0, wt: 4, rmin: 2, rmax: 2, uses: 25, effect: "slow" },
+  facon:      { name: "Facón",  type: "sword", mt: 4, hit: 85, crit: 5, wt: 3, rmin: 1, rmax: 1, uses: 40 }
+});
+let locustActive = false;
+function movOf(u) { return Math.max(1, CLASSES[u.cls].mov - (u.slowUntil === turn ? 2 : 0) - (u.team === "e" && locustActive ? 1 : 0)); }
+function unitCoat(u) { return u.face === "gaucho" ? "#8a4a2a" : u.team === "p" ? "#2d5aa8" : "#b8301f"; }
+function hatFor(u) { return faceSpec(u).hat; }
+
+// ----- personajes de Tucuman -----
+Object.assign(FACES, {
+  101: { skin: "fair", hair: "#7a5a3a", hairHi: "#9a7a52", eye: "#4a6a8a", style: "swept", hat: "bicorne", coat: "#274f95", collar: "#b3261e", brow: 1.8, jaw: 0.96, nose: 1.15, belts: false, sash: true, epa: true, lines: 1 },
+  102: { skin: "tan",  hair: "#2a1a10", hairHi: "#4a3220", eye: "#3a2616", style: "cropped", hat: "shako", hatCol: "#1d3d6b", coat: "#2d5aa8", collar: "#b3261e", brow: 2.6, jaw: 1.04, nose: 1.1, stache: true, belts: true, epa: true },
+  103: { skin: "fair", hair: "#4a2f1a", hairHi: "#6a4a2c", eye: "#3a2a1a", style: "short", hat: "none", coat: "#274f95", collar: "#b3261e", brow: 2.0, jaw: 0.95, nose: 1.0, side: true, belts: false, epa: false },
+  104: { skin: "tan",  hair: "#241810", hairHi: "#3a2a1c", eye: "#2a1c10", style: "cropped", hat: "gaucho", coat: "#8a4a2a", collar: "#b3261e", brow: 2.8, jaw: 1.06, nose: 1.2, stache: true, belts: false },
+  111: { skin: "old",  hair: "#55555a", hairHi: "#8a8a90", eye: "#3a4048", style: "swept", hat: "tricorn", coat: "#a5281d", collar: "#262626", brow: 2.4, jaw: 1.02, nose: 1.35, side: true, belts: false, epa: true, lines: 2, browCol: "#6a6a70" },
+  gaucho: { skin: "tan", hair: "#241810", hairHi: "#3a2a1c", eye: "#2a1c10", style: "cropped", hat: "gaucho", coat: "#8a4a2a", collar: "#b3261e", brow: 2.4, jaw: 1.03, nose: 1.1, belts: false }
+});
+Object.assign(SPK, {
+  bel: { unit: 101, name: "Gral. Manuel Belgrano" },
+  dvz: { unit: 102, name: "Cnel. Díaz Vélez" },
+  lam: { unit: 103, name: "Alf. Lamadrid" },
+  gau: { unit: 104, name: "Gaucho tucumano" },
+  pio: { unit: 111, name: "Cnel. Pío Tristán" }
+});
+Object.assign(NAMED_CRY, { 101: "¡Por la Patria, soldados!", 102: "¡A ellos, caballería!", 103: "¡Viva la Patria!", 104: "¡Por la tierra tucumana!", 105: "¡Viva la Patria!", 106: "¡Aquí nacimos!", 111: "¡Viva el Rey y España!" });
+
+// ----- dialogos de Tucuman -----
+const INTRO_T = [
+  { bg: "carreras", cap: "San Miguel de Tucumán, septiembre de 1812. Tras el Éxodo Jujeño, el Ejército del Norte llega hasta aquí. Buenos Aires ordena seguir la retirada hasta Córdoba." },
+  { who: "dvz", side: "L", mood: "serious", text: "General, las órdenes son claras: continuar hacia Córdoba. Pero Tristán nos pisa los talones, y el pueblo tucumano pide que nos quedemos." },
+  { who: "bel", side: "R", mood: "serious", text: "Lo sé, coronel. Si seguimos retirándonos, entregamos todo el Norte. Nos quedamos: presentaremos batalla aquí." },
+  { who: "lam", side: "L", mood: "smile",   text: "¡Cuente conmigo, mi general! Somos pocos, pero peleamos en nuestra propia tierra." },
+  { who: "gau", side: "L", mood: "angry",   text: "Los gauchos conocemos cada pasto de este campo, mi general. ¡De aquí no nos saca nadie!" },
+  { who: "bel", side: "R", mood: "angry",   text: "No peleamos por nosotros, sino por la Patria. ¡Formen en el Campo de las Carreras!" },
+  { cap: "24 de septiembre de 1812. Los realistas del coronel Pío Tristán avanzan sobre el Campo de las Carreras." },
+  { who: "pio", side: "R", mood: "angry",   text: "¿Ésos son los rebeldes que huían? Aplástenlos antes del mediodía. ¡Viva el Rey!" },
+  { who: "bel", side: "L", mood: "serious", text: "¡Soldados! ¡La Patria nos mira! ¡Adelante!" }
+];
+const EPILOGUE_T = [
+  { bg: "carreras", cap: "Tras horas de combate, los realistas rompen filas y se retiran hacia el norte, dejando cañones y banderas." },
+  { who: "dvz", side: "L", mood: "smile",   text: "¡Los hemos vencido, mi general! Tristán huye hacia Salta." },
+  { who: "bel", side: "R", mood: "serious", text: "Esta victoria detiene la invasión, coronel. Pero la guerra apenas empieza." },
+  { who: "lam", side: "L", mood: "smile",   text: "Hasta las mujeres de Tucumán nos ayudaron con la munición. ¡Viva la Patria!" },
+  { who: "bel", side: "R", mood: "smile",   text: "Se lo debemos a Dios, a este pueblo y a la Virgen de la Merced." },
+  { cap: "Belgrano dejó su bastón de mando a los pies de la Virgen de la Merced, a quien nombró Generala del Ejército." }
+];
+function locustLines() {
+  return [
+    { bg: "langostas", ph: 0, cap: "De pronto, una densa nube oscurece el cielo: una manga de langostas se abate sobre el campo." },
+    { ph: 1, cap: "Cae sobre las filas realistas y las desordena: los hombres tropiezan, pierden puntería y rompen la formación." },
+    { who: "pio", side: "R", mood: "sad",     text: "¡Maldición! ¿Qué es esto? ¡Mantengan las filas!" },
+    { who: "bel", side: "L", mood: "serious", text: "No sé qué es, pero es nuestra oportunidad. ¡Aprovechen el desorden!" },
+    { cap: "Según la tradición, fue un auxilio inesperado para el ejército patriota. Los realistas pierden puntería (-15 de golpe) y movilidad (-1)." }
+  ];
+}
+function midLinesT() {
+  const lam = units.find(u => u.id === 103), dvz = units.find(u => u.id === 102), pio = units.find(u => u.id === 111);
+  const lines = [
+    { bg: "carreras", cap: "La batalla se inclina: los realistas empiezan a flaquear." },
+    { who: "bel", side: "L", mood: "angry", text: "¡Resistan, compañeros! ¡Ya ceden! ¡Un esfuerzo más y la victoria es nuestra!" }
+  ];
+  const ally = [lam, dvz].find(u => u && u.hp > 0);
+  if (ally) lines.push({ who: ally.id === 103 ? "lam" : "dvz", side: "R", mood: "smile", text: "¡Viva la Patria! ¡Estamos con usted, mi general!" });
+  if (pio && pio.hp > 0) lines.push({ who: "pio", side: "R", mood: "angry", text: "¡No retrocedan! ¡Viva el Rey! ¡Sostengan las filas!" });
+  return lines;
+}
+
+// ----- escenarios nuevos -----
+function drawCarreras(t) {
+  const g = ctx.createLinearGradient(0, 0, 0, 260); g.addColorStop(0, "#78b4e6"); g.addColorStop(1, "#f3ead0");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, 640, 440);
+  const sg = ctx.createRadialGradient(120, 110, 6, 120, 110, 150); sg.addColorStop(0, "rgba(255,244,200,.9)"); sg.addColorStop(1, "rgba(255,244,200,0)");
+  ctx.fillStyle = sg; ctx.fillRect(0, 0, 400, 300); disc(ctx, 120, 110, 24, "#fff7da");
+  for (const [cx0, cy0, sc, sp] of [[80, 50, 1, 0.6], [330, 38, 0.8, 0.9], [520, 78, 0.9, 0.5]]) {
+    const cx = ((cx0 + t / 160 * sp) % 780) - 70; ctx.fillStyle = "rgba(255,255,255,.9)";
+    for (const [dx, dy, rx, ry] of [[0, 0, 34, 12], [-22, 5, 22, 9], [24, 5, 26, 9]]) { ctx.beginPath(); ctx.ellipse(cx + dx * sc, cy0 + dy * sc, rx * sc, ry * sc, 0, 0, 7); ctx.fill(); }
+  }
+  for (const [col, base, amp, ph2] of [["#a9b9d4", 215, 40, 0], ["#8ea3c6", 232, 32, 2], ["#738bb0", 246, 22, 5]]) {   // sierras del Aconquija
+    ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(0, 300);
+    for (let x = 0; x <= 640; x += 16) ctx.lineTo(x, base - amp * (0.55 + 0.45 * Math.sin(x / 70 + ph2)) * (0.7 + 0.3 * Math.sin(x / 23 + ph2 * 2)));
+    ctx.lineTo(640, 300); ctx.closePath(); ctx.fill();
+  }
+  ctx.fillStyle = "#8aab54"; ctx.fillRect(0, 250, 640, 190);
+  ctx.fillStyle = "#7a9c48"; for (let i = 0; i < 9; i++) ctx.fillRect(0, 262 + i * 10, 640, 3);
+  for (const hx of [60, 170, 470, 580]) { ctx.fillStyle = "#e8dcc0"; ctx.fillRect(hx, 238, 22, 12); PP(ctx, `M${hx - 3},238 L${hx + 11},228 L${hx + 25},238 Z`, "#a9492f", null); }
+  for (const tx of [30, 120, 260, 400, 520, 610]) { ctx.fillStyle = "#4a3320"; ctx.fillRect(tx, 240, 3, 12); disc(ctx, tx + 1, 236, 9, "#3a7a34"); }
+}
+function drawLangostas(t, rel, ph) {
+  drawCarreras(t);
+  ctx.fillStyle = "rgba(70,56,10," + (ph >= 1 ? 0.42 : 0.3) + ")"; ctx.fillRect(0, 0, 640, 440);
+  const foe = units.find(u => u.team === "e" && u.cls === "inf");
+  if (foe) for (let i = 0; i < 4; i++) {
+    ctx.save(); ctx.translate(380 + i * 62 + Math.sin(t / 130 + i) * (ph >= 1 ? 9 : 2), 272 + (i % 2) * 6); if (ph >= 1) ctx.rotate(Math.sin(t / 210 + i * 2) * 0.14); ctx.scale(-0.55, 0.55); LWMUL = 1;
+    bigInf(ctx, foe, t + i * 200, "lance"); ctx.restore();
+  }
+  const n = ph >= 1 ? 190 : Math.min(120, Math.floor(rel / 18));
+  ctx.fillStyle = "#2a2208"; ctx.strokeStyle = "#2a2208"; ctx.lineWidth = 1;
+  for (let i = 0; i < n; i++) {
+    const sx = ((rnd(i, 1, 3) * 760 + t * (0.05 + rnd(i, 2, 4) * 0.12)) % 780) - 70, sy = 24 + rnd(i, 5, 6) * 240 + Math.sin(t / 170 + i) * 9;
+    ctx.beginPath(); ctx.ellipse(sx, sy, 3.4, 1.4, 0.3, 0, 7); ctx.fill();
+    const w = Math.sin(t / 40 + i) * 3; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx - 3, sy - 3 - w); ctx.moveTo(sx, sy); ctx.lineTo(sx + 2, sy - 3 + w); ctx.stroke();
+  }
+}
+function drawBubbleBola(p) {                                      // boleadoras girando en el aire
+  ctx.strokeStyle = "#5a3a20"; ctx.lineWidth = 1.6; ctx.fillStyle = "#3a2a1c";
+  for (let i = 0; i < 3; i++) {
+    const a = p.a * 14 + i * 2.094, bx = p.x + Math.cos(a) * 16, by = p.y + Math.sin(a) * 9;
+    ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(bx, by); ctx.stroke(); ctx.beginPath(); ctx.arc(bx, by, 4.5, 0, 7); ctx.fill();
+  }
+}
+
+// ----- eventos de turno (langostas) -----
+async function runTurnEvent() {
+  const ev = B.turnEvents && B.turnEvents[turn];
+  if (!ev || evFlags["t" + turn]) return;
+  evFlags["t" + turn] = true;
+  ev.apply();
+  if (fastMode) return;
+  busy = true; await playDialogue(ev.lines()); busy = false;
+}
+
+// ================= REGISTRO DE BATALLAS =================
+const SL_MAP = MAP.slice();
+const TUC_MAP = [
+  "T..S..S.~..T...T",
+  "..T.....~...S...",
+  ".S..CC..~..T....",
+  ".S..CC..~....S..",
+  ".....T.......S..",
+  "....T......T....",
+  ".....T.......S..",
+  ".S..CC..~....S..",
+  ".S..CC..~..T....",
+  "..T.....~...S...",
+  "T..S..S.~..T...T"
+];
+function tucUnits() {
+  return [
+    mk(101, "Gral. Belgrano",     "p", "cav", 3, 5, [28, 7, 8, 8, 5, 6, 10], ["corvo", "carabina"], { leader: true }),
+    mk(102, "Cnel. Díaz Vélez", "p", "cav", 6, 4, [24, 8, 7, 9, 4, 5, 10], ["lanza", "carabina"]),
+    mk(103, "Alf. Lamadrid",      "p", "cav", 6, 6, [21, 6, 8, 10, 3, 7, 8], ["sable", "boleadoras"]),
+    mk(104, "Gaucho",             "p", "cav", 2, 3, [20, 6, 6, 9, 3, 5, 8], ["lanza", "boleadoras"], { face: "gaucho" }),
+    mk(105, "Gaucho",             "p", "cav", 2, 7, [20, 6, 6, 9, 3, 5, 8], ["facon", "boleadoras"], { face: "gaucho" }),
+    mk(106, "Gaucho",             "p", "cav", 7, 5, [20, 6, 6, 9, 3, 5, 8], ["lanza", "boleadoras"], { face: "gaucho" }),
+    mk(107, "Infante del Norte",  "p", "inf", 5, 5, [22, 6, 5, 6, 4, 4, 9], ["bayoneta", "fusil"]),
+    mk(108, "Infante del Norte",  "p", "inf", 4, 6, [22, 6, 5, 6, 4, 4, 9], ["bayoneta", "fusil"]),
+    mk(109, "Cañón patriota",  "p", "art", 6, 5, [14, 5, 4, 3, 2, 2, 12], ["canon"]),
+    mk(111, "Cnel. Pío Tristán", "e", "inf", 13, 5, [27, 7, 7, 6, 5, 5, 10], ["bayoneta", "fusil"], { leader: true }),
+    mk(112, "Infante realista",   "e", "inf", 10, 4, [20, 6, 4, 5, 3, 2, 8], ["bayoneta", "fusil"]),
+    mk(113, "Infante realista",   "e", "inf", 10, 5, [20, 6, 4, 5, 3, 2, 8], ["machete", "fusil"]),
+    mk(114, "Infante realista",   "e", "inf", 10, 6, [20, 6, 4, 5, 3, 2, 8], ["bayoneta", "fusil"]),
+    mk(115, "Infante realista",   "e", "inf", 11, 3, [20, 6, 4, 5, 3, 2, 8], ["machete", "fusil"]),
+    mk(116, "Infante realista",   "e", "inf", 11, 7, [20, 6, 4, 5, 3, 2, 8], ["bayoneta", "fusil"]),
+    mk(117, "Infante realista",   "e", "inf", 12, 5, [20, 6, 4, 5, 3, 2, 8], ["bayoneta", "fusil"]),
+    mk(118, "Dragón realista", "e", "cav", 12, 3, [20, 6, 5, 8, 3, 3, 9], ["sable", "carabina"]),
+    mk(119, "Dragón realista", "e", "cav", 12, 7, [20, 6, 5, 8, 3, 3, 9], ["sable", "carabina"]),
+    mk(120, "Cañón realista",  "e", "art", 13, 4, [14, 5, 3, 3, 1, 1, 12], ["canon"]),
+    mk(121, "Cañón realista",  "e", "art", 13, 6, [14, 5, 3, 3, 1, 1, 12], ["canon"])
+  ];
+}
+const BATTLES = {
+  tucuman: {
+    id: "tucuman", order: 1, title: "TUCUMÁN", date: "24 de septiembre de 1812",
+    blurb: "Belgrano desobedece la orden de retirarse y enfrenta a los realistas en el Campo de las Carreras.",
+    map: TUC_MAP, leaderId: 101, leaderFall: "Belgrano ha caído.",
+    pName: "Ejército del Norte", pBanner: "FASE DEL EJÉRCITO DEL NORTE",
+    units: tucUnits,
+    diff: {
+      easy:   { drop: [117, 119, 121, 115], hpM: 0.8, strD: -1, pHp: 6 },
+      normal: { drop: [117, 119],           hpM: 0.9, strD: 0,  pHp: 3 },
+      hard:   { drop: [117, 119],           hpM: 1,   strD: 0,  pHp: 2 }
+    },
+    decor: [{ x: 0, y: 4, k: "cow" }, { x: 0, y: 6, k: "cow" }, { x: 1, y: 10, k: "cow" }, { x: 14, y: 8, k: "cow" }, { x: 3, y: 9, k: "hay" }, { x: 14, y: 9, k: "hay" }, { x: 0, y: 9, k: "hay" }, { x: 15, y: 2, k: "hay" }],
+    building: "rancho",
+    startLog: "Los ejércitos se enfrentan en el Campo de las Carreras.",
+    introHTML:
+      "<h1>TUCUMÁN</h1><h3>24 de septiembre de 1812</h3>" +
+      "<p>El Ejército del Norte, tras el Éxodo Jujeño, recibe la orden de seguir retirándose hasta Córdoba. El general Manuel Belgrano decide desobedecer y dar batalla en Tucumán, con muchos menos hombres que los realistas de Pío Tristán.</p>" +
+      "<p><b>Objetivo:</b> derrota a todos los realistas.<br><b>Derrota:</b> si cae Belgrano (★) o todo tu ejército.</p>" +
+      "<p class='help'><b>Consejos:</b> un arroyo parte el campo y solo se cruza por el vado central (3 casillas): ahí se decide la batalla. Los sembrados dan +10 de esquive. Tus gauchos llevan <i>boleadoras</i>: si aciertan, el enemigo pierde 2 de movimiento en su turno. Y hacia el tercer turno sucederá algo inesperado...</p>",
+    intro: INTRO_T, epilogue: EPILOGUE_T,
+    midLines: midLinesT,
+    duel: { a: 101, b: 111, lines: [
+      { bg: "carreras", cap: "Frente a frente: el general Belgrano y el coronel Pío Tristán." },
+      { who: "bel", side: "L", mood: "serious", text: "Aquí termina su avance, coronel Tristán." },
+      { who: "pio", side: "R", mood: "angry",   text: "¡Ni usted ni su ejército de rebeldes me detendrán! ¡Viva el Rey!" },
+      { who: "bel", side: "L", mood: "angry",   text: "Entonces que decida el campo de batalla. ¡Por la Patria!" }
+    ] },
+    turnEvents: { 3: { apply() { locustActive = true; log("¡Una manga de langostas desordena a los realistas! (-15 de golpe, -1 de movimiento)", "#ffd84a"); }, lines: locustLines } },
+    victoryHTML() {
+      return "<h1>¡VICTORIA!</h1><h3>La batalla que salvó a la Revolución</h3>" +
+        "<p>El 24 de septiembre de 1812 el Ejército del Norte, con muchos menos hombres, venció a los realistas de Pío Tristán en el Campo de las Carreras. Belgrano había desobedecido la orden de retirarse a Córdoba, y esa decisión detuvo la invasión que venía desde el Alto Perú.</p>" +
+        "<p>Según la tradición, una manga de langostas desordenó a los realistas durante el combate. Belgrano atribuyó el triunfo a la Virgen de la Merced, a quien nombró Generala del Ejército.</p>";
+    },
+    defeatHTML: "<p>La historia fue distinta: el Ejército del Norte venció. Prueba defender el vado con el cañón y los gauchos, usa las boleadoras para frenar a la infantería y aprovecha el desorden del tercer turno.</p>"
+  },
+  sanlorenzo: {
+    id: "sanlorenzo", order: 2, title: "SAN LORENZO", date: "3 de febrero de 1813",
+    blurb: "Los Granaderos a Caballo de San Martín emboscan a los realistas junto al Paraná.",
+    map: SL_MAP, leaderId: 1, leaderFall: "San Martin ha caido.",
+    pName: "Granaderos", pBanner: "FASE DE LOS GRANADEROS",
+    units: baseUnits, diff: DIFF, decor: [],
+    startLog: "Los realistas desembarcan. ¡A la carga!",
+    introHTML:
+      "<h1>SAN LORENZO</h1><h3>3 de febrero de 1813</h3>" +
+      "<p>Una flota realista desembarca sobre la barranca del Parana para saquear la region. El coronel Jose de San Martin, con un punado de Granaderos a Caballo recien formados, los espera oculto tras el convento de San Carlos.</p>" +
+      "<p><b>Objetivo:</b> derrota a todos los realistas.<br><b>Derrota:</b> si cae San Martin (★) o todos tus Granaderos.</p>" +
+      "<p class='help'><b>Consejos:</b> los montes dan +1 de defensa y +20 de esquive; los cañones realistas no pueden contraatacar de cerca: ve por ellos con la caballería.</p>",
+    intro: INTRO, epilogue: EPILOGUE,
+    midLines() {
+      const ally = [3, 2, 4].map(id => units.find(u => u.id === id)).find(u => u && u.hp > 0);
+      const who = { 3: "esc", 2: "ber", 4: "cab" }, zab = units.find(u => u.id === 17);
+      const lines = [
+        { bg: "campo", cap: "La batalla se inclina: los realistas empiezan a flaquear." },
+        { who: "sm", side: "L", mood: "angry", text: "¡Ya los tenemos, granaderos! ¡Un último esfuerzo y los arrojamos al Paraná!" }
+      ];
+      if (ally) lines.push({ who: who[ally.id], side: "R", mood: "smile", text: ally.id === 4 ? "¡Viva la Patria, mi coronel! ¡Por Corrientes!" : "¡Viva la Patria! ¡Estamos con usted, mi coronel!" });
+      if (zab && zab.hp > 0) lines.push({ who: "zab", side: "R", mood: "angry", text: "¡Firmes, soldados! ¡Viva el Rey! ¡No cederemos ni una pulgada!" });
+      return lines;
+    },
+    duel: { a: 1, b: 17, lines: [
+      { bg: "campo", cap: "Frente a frente: el coronel San Martín y el comandante Zabala." },
+      { who: "sm",  side: "L", mood: "angry",   text: "¡Rinda las armas, Zabala! La Patria no retrocede." },
+      { who: "zab", side: "R", mood: "angry",   text: "¡Jamás! ¡Viva el Rey! ¡Venderé cara mi derrota!" },
+      { who: "sm",  side: "L", mood: "serious", text: "Entonces que decida el sable. ¡Por la libertad!" }
+    ] },
+    turnEvents: null,
+    victoryHTML() {
+      const cabral = units.find(u => u.id === 4).hp > 0;
+      return "<h1>¡VICTORIA!</h1><h3>Primer combate de San Martin en suelo argentino</h3>" +
+        "<p>En menos de quince minutos los Granaderos arrollaron a los realistas, que se retiraron a sus barcos. Fue la unica batalla que San Martin libro en el actual territorio argentino.</p>" +
+        "<p>En el combate, San Martin quedo atrapado bajo su caballo herido. El soldado correntino Juan Bautista Cabral lo salvo y murio por las heridas diciendo: <i>«Muero contento, hemos batido al enemigo»</i>." + (cabral ? " (En tu version, Cabral sobrevivio.)" : "") + "</p>";
+    },
+    defeatHTML: "<p>La historia fue distinta: los Granaderos vencieron. Intentalo de nuevo: usa el monte, ataca primero a los cañones y elige bien el arma contra cada enemigo.</p>"
+  }
+};
+// ================= ESTILO PROPIO: CULTIVOS, RANCHOS, HENO Y VACAS (vectorial) =================
+function drawCrops(x, y, t) {                                     // sembrado de maiz
+  const px = x * TS, py = y * TS;
+  ctx.fillStyle = "#8a6a3c"; ctx.fillRect(px, py, TS, TS);
+  ctx.fillStyle = "#6e5028"; for (let i = 0; i < 4; i++) ctx.fillRect(px, py + 5 + i * 10, TS, 3);
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) {
+    const bx = px + 5 + c * 10, by = py + 12 + r * 12, sw = Math.sin(t / 700 + x + y * 2 + c + r) * 1.1;
+    ctx.strokeStyle = "#2f6a24"; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.moveTo(bx, by + 5); ctx.lineTo(bx + sw, by - 7); ctx.stroke();
+    ctx.strokeStyle = "#4f9a3a"; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.moveTo(bx + sw * 0.5, by - 1); ctx.lineTo(bx - 4 + sw, by - 5); ctx.moveTo(bx + sw * 0.5, by + 1); ctx.lineTo(bx + 4 + sw, by - 3); ctx.stroke();
+    ctx.fillStyle = "#e8c25a"; ctx.fillRect(bx + sw - 1, by - 9, 2.4, 4);
+  }
+}
+function drawTree(x, y, t) { drawTreeVec(x, y, t); }
+function drawHay(px, py) {
+  ctx.fillStyle = "rgba(0,0,0,.25)"; ctx.beginPath(); ctx.ellipse(px + 20, py + 35, 14, 4, 0, 0, 7); ctx.fill();
+  PP(ctx, `M${px + 6},${py + 34} C${px + 6},${py + 12} ${px + 34},${py + 12} ${px + 34},${py + 34} Z`, "#d9b04a", "#7a5a1a", 1.4);
+  PP(ctx, `M${px + 20},${py + 14} L${px + 20},${py + 34}`, null, "#b08a2c", 1.2); PP(ctx, `M${px + 12},${py + 18} C${px + 11},${py + 26} ${px + 11},${py + 30} ${px + 12},${py + 34}`, null, "#b08a2c", 1);
+  PP(ctx, `M${px + 28},${py + 18} C${px + 29},${py + 26} ${px + 29},${py + 30} ${px + 28},${py + 34}`, null, "#b08a2c", 1); PP(ctx, `M${px + 14},${py + 16} C${px + 17},${py + 12} ${px + 23},${py + 12} ${px + 26},${py + 16}`, null, "#f0d27a", 2, 0.8);
+}
+function drawCow(px, py, t) {
+  const bob = Math.sin(t / 600 + px) * 0.8;
+  ctx.fillStyle = "rgba(0,0,0,.25)"; ctx.beginPath(); ctx.ellipse(px + 20, py + 35, 14, 4, 0, 0, 7); ctx.fill();
+  ctx.save(); ctx.translate(0, bob);
+  for (const lx of [9, 14, 25, 30]) PP(ctx, `M${px + lx},${py + 28} L${px + lx},${py + 35}`, null, "#3a2a1c", 3);
+  PP(ctx, `M${px + 6},${py + 22} C${px + 6},${py + 14} ${px + 30},${py + 14} ${px + 32},${py + 22} C${px + 32},${py + 30} ${px + 6},${py + 30} ${px + 6},${py + 22} Z`, "#f4efe4", INK, 1.3);
+  PP(ctx, `M${px + 12},${py + 17} C${px + 17},${py + 15} ${px + 18},${py + 21} ${px + 13},${py + 23} Z`, "#3a2a1c", null);
+  PP(ctx, `M${px + 23},${py + 20} C${px + 28},${py + 19} ${px + 29},${py + 25} ${px + 24},${py + 26} Z`, "#3a2a1c", null);
+  PP(ctx, `M${px + 30},${py + 17} L${px + 37},${py + 15} L${px + 38},${py + 22} L${px + 31},${py + 24} Z`, "#f4efe4", INK, 1.2);
+  PP(ctx, `M${px + 37},${py + 15} L${px + 38},${py + 12}`, null, INK, 1.5); disc(ctx, px + 35, py + 18, 0.9, "#111");
+  PP(ctx, `M${px + 6},${py + 20} C${px + 2},${py + 22} ${px + 3},${py + 28} ${px + 4},${py + 30}`, null, "#3a2a1c", 1.6);
+  ctx.restore();
+}
+function drawDecor(t) {
+  if (!B.decor) return;
+  for (const d of B.decor) { if (d.k === "hay") drawHay(d.x * TS, d.y * TS); else if (d.k === "cow") drawCow(d.x * TS, d.y * TS, t); }
+}
+function drawRancho(X, Y, Wd, Hd) {                               // rancho colonial: paredes blancas, techo de tejas, sin cruz
+  ctx.fillStyle = "rgba(0,0,0,.28)"; ctx.beginPath(); ctx.ellipse(X + Wd / 2 + 4, Y + Hd - 1, Wd / 2 + 2, 6, 0, 0, 7); ctx.fill();
+  const wy = Y + Hd * 0.42;
+  PP(ctx, `M${X + 3},${wy} L${X + Wd - 3},${wy} L${X + Wd - 3},${Y + Hd - 3} L${X + 3},${Y + Hd - 3} Z`, "#f1e8d2", "#7a6a48", 1.2);
+  PP(ctx, `M${X + Wd - 12},${wy} L${X + Wd - 3},${wy} L${X + Wd - 3},${Y + Hd - 3} L${X + Wd - 12},${Y + Hd - 3} Z`, "#c9bc9a", null, 0, 0.5);
+  PP(ctx, `M${X + 3},${Y + Hd - 9} L${X + Wd - 3},${Y + Hd - 9} L${X + Wd - 3},${Y + Hd - 3} L${X + 3},${Y + Hd - 3} Z`, "#b8a982", null, 0, 0.5);
+  PP(ctx, `M${X - 4},${wy + 3} L${X + Wd * 0.1},${Y + 8} L${X + Wd * 0.9},${Y + 8} L${X + Wd + 4},${wy + 3} Z`, "#b7492f", "#6a2616", 1.3);
+  ctx.strokeStyle = "rgba(90,25,12,.5)"; ctx.lineWidth = 1; ctx.beginPath();
+  for (let i = 1; i <= 3; i++) { const yy = Y + 8 + i * (wy - Y - 5) / 4.2; ctx.moveTo(X + Wd * 0.1 - i * 1.5, yy); ctx.lineTo(X + Wd * 0.9 + i * 1.5, yy); }
+  ctx.stroke();
+  PP(ctx, `M${X + Wd * 0.72},${Y + 10} L${X + Wd * 0.72},${Y - 3} L${X + Wd * 0.84},${Y - 3} L${X + Wd * 0.84},${Y + 12} Z`, "#c9bc9a", "#6a5a3a", 1.1);   // chimenea
+  for (const wxr of [0.14, 0.7]) {                                                                  // ventanas con postigos
+    const wx = X + Wd * wxr, ww = Wd * 0.16, wt = wy + 9;
+    PP(ctx, `M${wx},${wt} L${wx + ww},${wt} L${wx + ww},${wt + 15} L${wx},${wt + 15} Z`, "#2a3350", "#6a4a2a", 1.5);
+    PP(ctx, `M${wx - 3},${wt} L${wx},${wt} L${wx},${wt + 15} L${wx - 3},${wt + 15} Z`, "#3f7a4a", "#2a4a30", 1); PP(ctx, `M${wx + ww},${wt} L${wx + ww + 3},${wt} L${wx + ww + 3},${wt + 15} L${wx + ww},${wt + 15} Z`, "#3f7a4a", "#2a4a30", 1);
+  }
+  const dx0 = X + Wd * 0.42, dw = Wd * 0.16;
+  PP(ctx, `M${dx0},${Y + Hd - 3} L${dx0},${Y + Hd - 24} L${dx0 + dw},${Y + Hd - 24} L${dx0 + dw},${Y + Hd - 3} Z`, "#6a4423", "#2e1c0e", 1.3);
+  disc(ctx, dx0 + dw - 3, Y + Hd - 12, 0.9, GOLD, null);
+}
+
+// ================= TERRENO DE CERRO (Chacabuco y Maipu) =================
+TERRAIN.R = { name: "Cerro", cost: { cav: 3, inf: 2, art: 3 }, def: 2, avoid: 15 };
+function drawRock(x, y, t) {
+  const px = x * TS, py = y * TS, up = y > 0 && MAP[y - 1][x] === "R", dn = y < H - 1 && MAP[y + 1][x] === "R";
+  const g = ctx.createLinearGradient(px, py, px, py + TS); g.addColorStop(0, up ? "#a29668" : "#bfb386"); g.addColorStop(1, dn ? "#8a8160" : "#6e664a");
+  ctx.fillStyle = g; ctx.fillRect(px, py, TS, TS);
+  ctx.fillStyle = "rgba(110,100,60,.3)"; for (let i = 0; i < 2; i++) { ctx.beginPath(); ctx.ellipse(px + 8 + rnd(x, y, 70 + i) * 24, py + 10 + rnd(x, y, 72 + i) * 22, 10, 5, 0, 0, 7); ctx.fill(); }
+  for (let i = 0; i < 3; i++) {
+    const rx = px + 7 + rnd(x, y, 50 + i) * 26, ry = py + 10 + rnd(x, y, 60 + i) * 22, rw = 4 + rnd(x, y, 80 + i) * 5;
+    ctx.fillStyle = "#8d8a84"; ctx.beginPath(); ctx.moveTo(rx - rw, ry + 3); ctx.lineTo(rx - rw * 0.5, ry - rw * 0.8); ctx.lineTo(rx + rw * 0.6, ry - rw * 0.55); ctx.lineTo(rx + rw, ry + 3); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,.3)"; ctx.beginPath(); ctx.moveTo(rx - rw * 0.5, ry - rw * 0.8); ctx.lineTo(rx + rw * 0.6, ry - rw * 0.55); ctx.lineTo(rx, ry - 1); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "#4a4638"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(rx - rw, ry + 3); ctx.lineTo(rx - rw * 0.5, ry - rw * 0.8); ctx.lineTo(rx + rw * 0.6, ry - rw * 0.55); ctx.lineTo(rx + rw, ry + 3); ctx.closePath(); ctx.stroke();
+  }
+  ctx.strokeStyle = "#7a8a3a"; ctx.lineWidth = 1; for (let i = 0; i < 3; i++) { const bx = px + 4 + rnd(x, y, 90 + i) * 32, by = py + 26 + rnd(x, y, 95 + i) * 12; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx - 1, by - 5); ctx.moveTo(bx, by); ctx.lineTo(bx + 2, by - 4); ctx.stroke(); }
+  if (!up) { ctx.fillStyle = "rgba(255,255,230,.35)"; ctx.fillRect(px, py, TS, 2); }
+  if (!dn) { ctx.fillStyle = "rgba(40,30,10,.4)"; ctx.fillRect(px, py + TS - 3, TS, 3); }
+}
+
+// ================= REFUERZOS =================
+function unitForSpeaker(id) {                                    // un personaje puede hablar antes de aparecer en el mapa (refuerzos)
+  return units.find(x => x.id === id) || chaReinf().concat(maiReinf()).find(x => x.id === id) || units[0];
+}
+function spawn(list) {
+  const D = (B.diff && (B.diff[difficulty] || B.diff.normal)) || DIFF.normal;
+  for (const u of list) {
+    let bt = null, bd = 99;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const c = tile(x, y).cost; if (!c || c[u.cls] == null || unitAt(x, y)) continue;
+      const d = Math.abs(x - u.x) + Math.abs(y - u.y); if (d < bd) { bd = d; bt = { x, y }; }
+    }
+    if (bt) { u.x = bt.x; u.y = bt.y; }
+    if (u.team === "p") { u.maxhp += D.pHp; u.hp += D.pHp; }
+    units.push(u);
+  }
+}
+
+// ================= PERSONAJES DE LA CAMPANA DE CHILE =================
+Object.assign(FACES, {
+  202: { skin: "fair", hair: "#7a5232", hairHi: "#9a7248", eye: "#5a7a9a", style: "swept", hat: "bicorne", coat: "#274f95", collar: "#b3261e", brow: 2.2, jaw: 1.1, nose: 1.15, side: true, belts: false, epa: true, lines: 0 },
+  203: { skin: "tan",  hair: "#2a1a10", hairHi: "#4a3220", eye: "#3a2616", style: "cropped", hat: "shako", hatCol: "#1d3d6b", coat: "#2d5aa8", collar: "#b3261e", brow: 2.6, jaw: 1.0, nose: 1.2, stache: true, belts: true, epa: true },
+  204: { skin: "tan",  hair: "#3a2415", hairHi: "#5a3a24", eye: "#3a2a1a", style: "swept", hat: "shako", hatCol: "#1d3d6b", coat: "#2d5aa8", collar: "#b3261e", brow: 2.8, jaw: 1.06, nose: 1.1, side: true, belts: true, epa: true },
+  205: { skin: "fair", hair: "#4a3220", hairHi: "#6a4a30", eye: "#4a3a28", style: "cropped", hat: "bicorne", coat: "#274f95", collar: "#b3261e", brow: 2.0, jaw: 0.98, nose: 1.0, stache: true, belts: false, epa: true },
+  207: { skin: "tan",  hair: "#2a1a10", hairHi: "#4a3220", eye: "#3a2616", style: "cropped", hat: "shako", hatCol: "#1d3d6b", coat: "#2d5aa8", collar: "#b3261e", brow: 2.4, jaw: 1.02, nose: 1.1, side: true, belts: true, epa: true },
+  221: { skin: "fair", hair: "#2a2a2e", hairHi: "#4a4a50", eye: "#3a3a3a", style: "cropped", hat: "tricorn", coat: "#a5281d", collar: "#262626", brow: 2.6, jaw: 1.0, nose: 1.3, stache: true, belts: false, epa: true, lines: 1 },
+  321: { skin: "old",  hair: "#46464a", hairHi: "#7a7a80", eye: "#4a5058", style: "swept", hat: "tricorn", coat: "#a5281d", collar: "#262626", brow: 2.4, jaw: 1.02, nose: 1.25, side: true, belts: false, epa: true, lines: 1, browCol: "#5a5a5e" }
+});
+Object.assign(SPK, {
+  ohi: { unit: 202, name: "Brig. Bernardo O'Higgins" },
+  sol: { unit: 203, name: "Brig. Miguel Soler" },
+  nec: { unit: 204, name: "Necochea" },
+  lhe: { unit: 205, name: "Las Heras" },
+  bal: { unit: 207, name: "Balcarce" },
+  mar: { unit: 221, name: "Cnel. Rafael Maroto" },
+  osr: { unit: 321, name: "Gral. Mariano Osorio" }
+});
+Object.assign(NAMED_CRY, { 202: "¡Viva Chile y la Patria!", 203: "¡Que no escape ninguno!", 204: "¡Granaderos, a la carga!", 205: "¡Viva la Patria!", 207: "¡Viva la Patria!", 221: "¡Viva el Rey y España!", 321: "¡Viva el Rey!" });
+
+// ================= ESCENARIOS: ANDES, CHACABUCO, MAIPU, ABRAZO =================
+function ridgeShape(col, base, amp, freq, ph, snowY) {
+  ctx.beginPath(); ctx.moveTo(0, 330);
+  for (let x = 0; x <= 640; x += 8) ctx.lineTo(x, base - amp * (Math.abs(Math.sin(x / freq + ph)) * 0.7 + 0.3 * Math.sin(x / (freq * 0.37) + ph * 2)));
+  ctx.lineTo(640, 330); ctx.closePath(); ctx.fillStyle = col; ctx.fill();
+  if (snowY != null) { ctx.save(); ctx.clip(); ctx.fillStyle = "rgba(255,255,255,.92)"; ctx.fillRect(0, 0, 640, snowY); ctx.restore(); }
+}
+function drawFlag(x, y, t, s) {                                                                       // bandera celeste y blanca flameando
+  ctx.strokeStyle = "#5a3a20"; ctx.lineWidth = 2.5 * s; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - 46 * s); ctx.stroke();
+  for (let i = 0; i < 3; i++) {
+    const yy = y - 46 * s + i * 8 * s, w = Math.sin(t / 160 + i * 0.8) * 2.5 * s;
+    ctx.fillStyle = i === 1 ? "#ffffff" : "#8fcff0"; ctx.beginPath(); ctx.moveTo(x, yy); ctx.quadraticCurveTo(x + 14 * s, yy + w, x + 28 * s, yy + w * 0.6); ctx.lineTo(x + 28 * s, yy + 8 * s + w * 0.6); ctx.quadraticCurveTo(x + 14 * s, yy + 8 * s + w, x, yy + 8 * s); ctx.closePath(); ctx.fill();
+  }
+}
+function drawAndes(t) {
+  const g = ctx.createLinearGradient(0, 0, 0, 300); g.addColorStop(0, "#27386a"); g.addColorStop(0.5, "#e07a5a"); g.addColorStop(1, "#f6c98a");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, 640, 440);
+  const sg = ctx.createRadialGradient(480, 190, 8, 480, 190, 170); sg.addColorStop(0, "rgba(255,240,190,.95)"); sg.addColorStop(1, "rgba(255,200,130,0)");
+  ctx.fillStyle = sg; ctx.fillRect(0, 0, 640, 330);
+  ridgeShape("#8a7aa8", 170, 70, 62, 0.4, 130); ridgeShape("#6a5a88", 215, 78, 48, 2.1, 160); ridgeShape("#4a3a66", 262, 70, 40, 4.2, 215);
+  ctx.fillStyle = "#3a2c4a"; ctx.fillRect(0, 300, 640, 140);
+  for (let i = 0; i < 16; i++) {                                                                        // columna cruzando la cordillera
+    const s = (t * 0.028 + i * 34) % 560, x = 30 + s, y = 292 - s * 0.14 + Math.sin(s / 38) * 3, bob = Math.abs(Math.sin(s / 6)) * 1.4;
+    ctx.fillStyle = "rgba(0,0,0,.3)"; ctx.beginPath(); ctx.ellipse(x, y + 8, 6, 2, 0, 0, 7); ctx.fill();
+    if (i % 4 === 2) { ctx.fillStyle = "#6a4a2a"; ctx.fillRect(x - 7, y - 4 - bob, 14, 7); ctx.fillRect(x + 4, y - 9 - bob, 5, 6); ctx.fillRect(x - 6, y + 2 - bob, 2, 6); ctx.fillRect(x + 4, y + 2 - bob, 2, 6); }
+    else { ctx.fillStyle = "#2d5aa8"; ctx.fillRect(x - 2.5, y - 11 - bob, 5, 11); disc(ctx, x, y - 14 - bob, 2.8, "#e0b088"); ctx.fillStyle = "#1d3d6b"; ctx.fillRect(x - 3, y - 18 - bob, 6, 3); ctx.fillStyle = "#222"; ctx.fillRect(x + 3, y - 14 - bob, 1.2, 10); }
+    if (i === 15) drawFlag(x, y - 14 - bob, t, 0.5);
+  }
+  for (let i = 0; i < 40; i++) { ctx.fillStyle = "rgba(255,255,255," + (0.5 + 0.5 * Math.sin(t / 500 + i)).toFixed(2) + ")"; ctx.fillRect(rnd(i, 3, 1) * 640, rnd(i, 4, 2) * 120, 1.5, 1.5); }
+}
+function drawChacabuco(t) {
+  const g = ctx.createLinearGradient(0, 0, 0, 260); g.addColorStop(0, "#86aedb"); g.addColorStop(1, "#f1e6c4");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, 640, 440);
+  for (const [cx0, cy0, sc, sp] of [[100, 46, 1, 0.5], [380, 34, 0.8, 0.8]]) { const cx = ((cx0 + t / 170 * sp) % 780) - 70; ctx.fillStyle = "rgba(255,255,255,.9)"; for (const [dx, dy, rx, ry] of [[0, 0, 34, 12], [-22, 5, 22, 9], [24, 5, 26, 9]]) { ctx.beginPath(); ctx.ellipse(cx + dx * sc, cy0 + dy * sc, rx * sc, ry * sc, 0, 0, 7); ctx.fill(); } }
+  ridgeShape("#a6b4d0", 190, 62, 70, 0.9, 120); ridgeShape("#8a9cc0", 222, 44, 52, 2.5, 175);
+  ctx.fillStyle = "#6f9a44"; ctx.fillRect(0, 262, 640, 180);
+  PP(ctx, "M240,300 C320,240 430,190 640,184 L640,300 Z", "#a39063", "#6a5a38", 1.6);
+  PP(ctx, "M300,300 C370,252 470,214 640,206 L640,300 Z", "#8d7c52", null, 0, 0.55);
+  ctx.fillStyle = "#6a7a34"; for (let i = 0; i < 26; i++) { const sx = 280 + rnd(i, 1, 9) * 350, sy = 214 + rnd(i, 2, 8) * 70; if (sy > 300 - (sx - 240) * 0.2 - 6) continue; ctx.beginPath(); ctx.ellipse(sx, sy, 4, 2.4, 0, 0, 7); ctx.fill(); }
+  const foe = units.find(u => u.team === "e" && u.cls === "inf");
+  if (foe) for (let i = 0; i < 6; i++) { const sx = 430 + i * 38, sy = 232 - i * 4 + (i % 2) * 6; ctx.save(); ctx.translate(sx, sy); ctx.scale(-0.3, 0.3); LWMUL = 2; bigInf(ctx, foe, t + i * 130, "lance"); LWMUL = 1; ctx.restore(); }
+  for (let i = 0; i < 4; i++) { const a = ((t / 1400 + i * 0.25) % 1); disc(ctx, 470 + i * 40 + a * 10, 215 - a * 40 - i * 4, 8 + a * 12, "rgba(210,205,196," + (0.45 * (1 - a)).toFixed(2) + ")"); }
+  drawFlag(70, 292, t, 1);
+}
+function drawMaipu(t) {
+  const g = ctx.createLinearGradient(0, 0, 0, 250); g.addColorStop(0, "#9cc0e4"); g.addColorStop(1, "#f1e6c6");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, 640, 440);
+  for (const [cx0, cy0, sc, sp] of [[60, 50, 1, 0.5], [340, 36, 0.8, 0.9], [520, 70, 0.9, 0.6]]) { const cx = ((cx0 + t / 160 * sp) % 780) - 70; ctx.fillStyle = "rgba(255,255,255,.9)"; for (const [dx, dy, rx, ry] of [[0, 0, 34, 12], [-22, 5, 22, 9], [24, 5, 26, 9]]) { ctx.beginPath(); ctx.ellipse(cx + dx * sc, cy0 + dy * sc, rx * sc, ry * sc, 0, 0, 7); ctx.fill(); } }
+  ridgeShape("#b4c0d8", 196, 58, 66, 0.2, 130); ridgeShape("#93a4c6", 230, 40, 50, 3.1, 190);
+  ctx.fillStyle = "#9db55a"; ctx.fillRect(0, 252, 640, 190); ctx.fillStyle = "#8aa44a"; for (let i = 0; i < 9; i++) ctx.fillRect(0, 264 + i * 11, 640, 3);
+  PP(ctx, "M0,270 C80,246 160,246 230,268 L230,300 L0,300 Z", "#a39063", "#6a5a38", 1.4);
+  for (let i = 0; i < 10; i++) { ctx.fillStyle = "#2d5aa8"; ctx.fillRect(40 + i * 18, 262 + (i % 2) * 5, 4, 9); disc(ctx, 42 + i * 18, 259 + (i % 2) * 5, 2.4, "#e0b088"); ctx.fillStyle = "#c0392b"; ctx.fillRect(430 + i * 18, 262 + (i % 2) * 5, 4, 9); disc(ctx, 432 + i * 18, 259 + (i % 2) * 5, 2.4, "#e0b088"); }
+  for (let i = 0; i < 5; i++) { const a = ((t / 1800 + i * 0.2) % 1); disc(ctx, 120 + i * 100, 262 - a * 80, 10 + a * 18, "rgba(200,196,188," + (0.4 * (1 - a)).toFixed(2) + ")"); }
+}
+function drawAbrazo(t, rel, ph) {
+  drawMaipu(t);
+  ctx.fillStyle = "rgba(255,230,170,.18)"; ctx.fillRect(0, 0, 640, 440);
+  drawFlag(120, 286, t, 1.2);
+  const sm = unitForSpeaker(1), oh = unitForSpeaker(202);
+  const k = ph >= 1 ? 1 : Math.min(1, rel / 2400), xa = 215 + 85 * k, xb = 425 - 75 * k, G = 288;
+  for (const [u, x, flip] of [[sm, xa, 1], [oh, xb, -1]]) { ctx.save(); ctx.translate(x, G); ctx.scale(flip * 0.9, 0.9); LWMUL = 1; bigInf(ctx, u, t, "none", true); ctx.restore(); }
+  if (ph >= 1) {                                                                                       // brazos que se abrazan y cabestrillo
+    ctx.save(); ctx.translate(0, G); PP(ctx, `M${xa + 6},-104 C${xa + 22},-110 ${xb - 22},-110 ${xb - 4},-100 L${xb - 6},-88 C${xb - 22},-98 ${xa + 20},-98 ${xa + 8},-90 Z`, "#2d5aa8", INK, 1.6);
+    PP(ctx, `M${xb - 18},-118 L${xb - 4},-84 L${xb - 16},-82 L${xb - 26},-108 Z`, "#f4f0e4", INK, 1.2); ctx.restore();
+  }
+}
+
+// ================= DIALOGOS DE CHACABUCO Y MAIPU =================
+const INTRO_C = [
+  { bg: "andes", cap: "Enero de 1817. Tras cruzar la cordillera de los Andes con casi cuatro mil hombres, el Ejército de los Andes desciende hacia Chile." },
+  { who: "sm",  side: "L", mood: "serious", text: "Hemos cruzado los Andes, señores. Ahora hay que batir a Maroto antes de que reciba refuerzos." },
+  { who: "ohi", side: "R", mood: "smile",   text: "Mis hombres están listos, general. Chile nos espera." },
+  { who: "sol", side: "R", mood: "serious", text: "Mi división tomará el camino largo para cortarle la retirada por la retaguardia." },
+  { who: "sm",  side: "L", mood: "serious", text: "Así será. O'Higgins atacará de frente y Soler cerrará la trampa. Que ninguno se adelante antes de tiempo." },
+  { who: "ohi", side: "R", mood: "angry",   text: "¡Entendido, general! ¡Por la libertad de Chile!" },
+  { bg: "chacabuco", cap: "12 de febrero de 1817, Cuesta de Chacabuco. Los realistas del coronel Rafael Maroto aguardan en las alturas." },
+  { who: "mar", side: "R", mood: "angry",   text: "Subirán la cuesta cansados tras cruzar la cordillera. ¡Manténganse firmes! ¡Viva el Rey!" },
+  { who: "sm",  side: "L", mood: "angry",   text: "¡Soldados de los Andes! ¡Al ataque!" }
+];
+const EPILOGUE_C = [
+  { bg: "chacabuco", cap: "Atrapados entre dos fuegos, los realistas se rinden o huyen en desorden. La Cuesta de Chacabuco es patriota." },
+  { who: "ohi", side: "R", mood: "smile",   text: "¡Lo logramos, general! El camino a Santiago está abierto." },
+  { who: "sm",  side: "L", mood: "serious", text: "Falta mucho, brigadier. Esta victoria es solo el comienzo de la libertad de Chile." },
+  { who: "sol", side: "R", mood: "smile",   text: "La trampa se cerró a tiempo, mi general. ¡Viva la Patria!" },
+  { cap: "Dos días después, el Ejército de los Andes entró en Santiago. San Martín rechazó el gobierno de Chile y el cargo recayó en O'Higgins." }
+];
+function chaReinf() {
+  const mkS = (id, name, cls, x, y, st, w, ex) => mk(id, name, "p", cls, x, y, st, w, ex);
+  return [
+    mkS(203, "Brig. Soler", "cav", 15, 5, [24, 8, 7, 9, 4, 5, 10], ["sable", "carabina"]),
+    mkS(213, "Granadero a caballo", "cav", 15, 4, [20, 6, 5, 8, 3, 3, 9], ["sable", "carabina"]),
+    mkS(214, "Granadero a caballo", "cav", 15, 6, [20, 6, 5, 8, 3, 3, 9], ["sable", "carabina"]),
+    mkS(215, "Soldado de los Andes", "inf", 14, 5, [22, 6, 5, 6, 4, 4, 9], ["bayoneta", "fusil"])
+  ];
+}
+function chaLinesReinf() {
+  return [
+    { bg: "chacabuco", cap: "Mientras tanto, la división de Soler da la vuelta a la montaña y aparece por la retaguardia realista." },
+    { who: "sol", side: "L", mood: "angry", text: "¡Adelante! ¡Cerremos el paso: que no escape ninguno!" },
+    { who: "mar", side: "R", mood: "angry", text: "¡Nos rodean! ¡Mantengan las posiciones!" },
+    { who: "sm",  side: "L", mood: "smile", text: "Así se hace, Soler. ¡Ahora la trampa se cierra!" }
+  ];
+}
+function chaMid() {
+  const ally = [202, 205, 204].map(id => units.find(u => u.id === id)).find(u => u && u.hp > 0), mar = units.find(u => u.id === 221);
+  const who = { 202: "ohi", 205: "lhe", 204: "nec" };
+  const lines = [
+    { bg: "chacabuco", cap: "La batalla se decide: los realistas ceden en todas partes." },
+    { who: "sm", side: "L", mood: "angry", text: "¡Ya ceden, soldados! ¡Que no escape ninguno!" }
+  ];
+  if (ally) lines.push({ who: who[ally.id], side: "R", mood: "smile", text: "¡Viva la Patria! ¡Viva Chile!" });
+  if (mar && mar.hp > 0) lines.push({ who: "mar", side: "R", mood: "angry", text: "¡Resistan! ¡Viva el Rey! ¡No cedan la cuesta!" });
+  return lines;
+}
+const INTRO_M = [
+  { bg: "maipu", cap: "Marzo de 1818. Tras la sorpresa de Cancha Rayada, el ejército patriota parece deshecho. Pero San Martín lo reorganiza cerca de Santiago." },
+  { who: "sm",  side: "L", mood: "serious", text: "Cancha Rayada fue un golpe, no el final. Reúnan a los hombres: pelearemos en los llanos de Maipú." },
+  { who: "lhe", side: "R", mood: "angry",   text: "Los soldados quieren revancha, mi general. Están listos." },
+  { who: "bal", side: "R", mood: "smile",   text: "Osorio cree que estamos derrotados. Se llevará una sorpresa." },
+  { who: "sm",  side: "L", mood: "serious", text: "Ellos tienen la iniciativa; nosotros, la causa. ¡Formen en las lomas!" },
+  { cap: "5 de abril de 1818, llanos de Maipú. El general Mariano Osorio avanza con su ejército sobre Santiago." },
+  { who: "osr", side: "R", mood: "angry",   text: "Aplastamos a los rebeldes una vez; lo haremos de nuevo. ¡Viva el Rey!" },
+  { who: "sm",  side: "L", mood: "angry",   text: "¡Granaderos y soldados de los Andes! ¡Hoy se decide la libertad de Chile!" }
+];
+const EPILOGUE_M = [
+  { bg: "abrazo", ph: 0, cap: "Vencidos los realistas, San Martín y O'Higgins se buscan en medio del campo de batalla..." },
+  { ph: 1, cap: "Se funden en un abrazo que quedó en la historia: el Abrazo de Maipú." },
+  { who: "ohi", side: "R", mood: "smile", text: "¡Gloria al salvador de Chile!" },
+  { who: "sm",  side: "L", mood: "smile", text: "La gloria es de todos los soldados que pelearon hoy, general." },
+  { bg: "maipu", cap: "La victoria de Maipú aseguró la independencia de Chile y abrió el camino hacia el Perú, objetivo final del plan de San Martín." }
+];
+function maiReinf() { return [Object.assign(mk(202, "Brig. O'Higgins", "p", "inf", 0, 5, [28, 8, 6, 6, 6, 5, 10], ["sable", "fusil"]), { hp: 17 })]; }
+function maiLinesReinf() {
+  return [
+    { bg: "maipu", cap: "En medio de la batalla llega O'Higgins, con el brazo en cabestrillo por la herida de Cancha Rayada." },
+    { who: "ohi", side: "R", mood: "serious", text: "¡Aquí estoy, general! Una herida no me aparta de Chile." },
+    { who: "sm",  side: "L", mood: "smile",   text: "¡Bienvenido, general! Su presencia vale por mil hombres." }
+  ];
+}
+function maiMid() {
+  const ally = [205, 207, 202].map(id => units.find(u => u.id === id)).find(u => u && u.hp > 0), osr = units.find(u => u.id === 321);
+  const who = { 205: "lhe", 207: "bal", 202: "ohi" };
+  const lines = [
+    { bg: "maipu", cap: "La batalla se inclina: el ejército realista se desorganiza." },
+    { who: "sm", side: "L", mood: "angry", text: "¡Ya ceden! ¡Un empuje más, soldados de los Andes!" }
+  ];
+  if (ally) lines.push({ who: who[ally.id], side: "R", mood: "smile", text: "¡Viva la Patria! ¡Viva Chile libre!" });
+  if (osr && osr.hp > 0) lines.push({ who: "osr", side: "R", mood: "angry", text: "¡Resistan! ¡Viva el Rey! ¡No rompan filas!" });
+  return lines;
+}
+
+// ================= MAPAS, EJERCITOS Y CONFIGURACION =================
+const CHA_MAP = [
+  "...T......R....T",
+  "..T.....RRR.....",
+  "....T..RRRRR....",
+  ".......RRRRRR..T",
+  "..T....RRRRRRR..",
+  "......TRRRRRRR..",
+  "..T....RRRRRRR..",
+  ".......RRRRRR..T",
+  "....T..RRRRR....",
+  "..T.....RRR.....",
+  "...T......R....T"
+];
+const MAI_MAP = [
+  "RR..T.......T..R",
+  "R..........T....",
+  "..RRR.....T...RR",
+  "..RRR......RRR..",
+  "...R....SS...RR.",
+  "....T......T..R.",
+  "...R....SS...RR.",
+  "..RRR......RRR..",
+  "..RRR.....T...RR",
+  "R..........T....",
+  "RR..T.......T..R"
+];
+function chaUnits() {
+  const P = (id, n, cls, x, y, st, w, ex) => mk(id, n, "p", cls, x, y, st, w, ex), E = (id, n, cls, x, y, st, w, ex) => mk(id, n, "e", cls, x, y, st, w, ex);
+  const gr = [20, 6, 5, 8, 3, 3, 9], so = [22, 6, 5, 6, 4, 4, 9], ie = [26, 7, 5, 5, 5, 3, 8], dr = [24, 7, 5, 8, 4, 3, 9];
+  return [
+    P(1, "Gral. San Martin", "cav", 1, 5, [26, 8, 9, 10, 5, 7, 10], ["corvo", "carabina"], { leader: true }),
+    P(202, "Brig. O'Higgins", "inf", 4, 3, [28, 8, 6, 6, 6, 5, 10], ["sable", "fusil"]),
+    P(204, "Necochea", "cav", 4, 7, [24, 8, 7, 9, 4, 5, 10], ["sable", "carabina"]),
+    P(205, "Las Heras", "inf", 5, 5, [24, 7, 7, 7, 5, 5, 9], ["bayoneta", "fusil"]),
+    P(206, "Granadero a caballo", "cav", 3, 2, gr, ["sable", "carabina"]), P(207, "Granadero a caballo", "cav", 3, 8, gr, ["sable", "carabina"]),
+    P(208, "Soldado de los Andes", "inf", 5, 4, so, ["bayoneta", "fusil"]), P(209, "Soldado de los Andes", "inf", 5, 6, so, ["bayoneta", "fusil"]), P(210, "Soldado de los Andes", "inf", 3, 4, so, ["bayoneta", "fusil"]),
+    P(212, "Cañón de montaña", "art", 2, 5, [14, 5, 4, 3, 2, 2, 12], ["canon"]),
+    E(221, "Cnel. Maroto", "inf", 12, 5, [27, 7, 7, 6, 5, 5, 10], ["bayoneta", "fusil"], { leader: true }),
+    E(222, "Infante realista", "inf", 9, 3, ie, ["bayoneta", "fusil"]), E(223, "Infante realista", "inf", 9, 5, ie, ["machete", "fusil"]), E(224, "Infante realista", "inf", 9, 7, ie, ["bayoneta", "fusil"]),
+    E(225, "Infante realista", "inf", 10, 4, ie, ["bayoneta", "fusil"]), E(226, "Infante realista", "inf", 10, 6, ie, ["machete", "fusil"]),
+    E(227, "Infante realista", "inf", 11, 3, ie, ["bayoneta", "fusil"]), E(228, "Infante realista", "inf", 11, 7, ie, ["bayoneta", "fusil"]),
+    E(229, "Dragón realista", "cav", 13, 3, dr, ["sable", "carabina"]), E(230, "Dragón realista", "cav", 13, 7, dr, ["sable", "carabina"]),
+    E(231, "Cañón realista", "art", 11, 5, [18, 7, 3, 3, 2, 1, 12], ["canon"]), E(232, "Cañón realista", "art", 12, 4, [18, 7, 3, 3, 2, 1, 12], ["canon"])
+  ];
+}
+function maiUnits() {
+  const P = (id, n, cls, x, y, st, w, ex) => mk(id, n, "p", cls, x, y, st, w, ex), E = (id, n, cls, x, y, st, w, ex) => mk(id, n, "e", cls, x, y, st, w, ex);
+  const gr = [20, 6, 5, 8, 3, 3, 9], so = [22, 6, 5, 6, 4, 4, 9], ie = [20, 6, 4, 5, 3, 2, 8];
+  return [
+    P(1, "Gral. San Martin", "cav", 3, 5, [26, 8, 9, 10, 5, 7, 10], ["corvo", "carabina"], { leader: true }),
+    P(205, "Las Heras", "inf", 4, 3, [24, 7, 7, 7, 5, 5, 9], ["bayoneta", "fusil"]),
+    P(207, "Balcarce", "cav", 5, 4, [23, 8, 7, 9, 4, 5, 10], ["sable", "carabina"]),
+    P(208, "Granadero a caballo", "cav", 4, 6, gr, ["sable", "carabina"]), P(209, "Granadero a caballo", "cav", 5, 5, gr, ["sable", "carabina"]), P(210, "Granadero a caballo", "cav", 4, 7, gr, ["sable", "carabina"]),
+    P(211, "Soldado de los Andes", "inf", 3, 4, so, ["bayoneta", "fusil"]), P(212, "Soldado de los Andes", "inf", 3, 6, so, ["bayoneta", "fusil"]),
+    P(213, "Soldado de los Andes", "inf", 5, 3, so, ["bayoneta", "fusil"]), P(214, "Soldado de los Andes", "inf", 5, 7, so, ["bayoneta", "fusil"]),
+    P(215, "Cañón patriota", "art", 2, 3, [14, 5, 4, 3, 2, 2, 12], ["canon"]), P(216, "Cañón patriota", "art", 2, 7, [14, 5, 4, 3, 2, 2, 12], ["canon"]),
+    E(321, "Gral. Osorio", "inf", 14, 5, [27, 7, 7, 6, 5, 5, 10], ["bayoneta", "fusil"], { leader: true }),
+    E(322, "Cnel. Ordóñez", "inf", 13, 4, [24, 7, 6, 5, 5, 4, 9], ["bayoneta", "fusil"]),
+    E(323, "Infante realista", "inf", 12, 3, ie, ["bayoneta", "fusil"]), E(324, "Infante realista", "inf", 12, 7, ie, ["machete", "fusil"]), E(325, "Infante realista", "inf", 11, 4, ie, ["bayoneta", "fusil"]),
+    E(326, "Infante realista", "inf", 11, 6, ie, ["machete", "fusil"]), E(327, "Infante realista", "inf", 12, 5, ie, ["bayoneta", "fusil"]), E(328, "Infante realista", "inf", 13, 6, ie, ["bayoneta", "fusil"]),
+    E(329, "Dragón realista", "cav", 13, 2, gr, ["sable", "carabina"]), E(330, "Dragón realista", "cav", 13, 8, gr, ["sable", "carabina"]),
+    E(331, "Cañón realista", "art", 14, 3, [14, 5, 3, 3, 1, 1, 12], ["canon"]), E(332, "Cañón realista", "art", 14, 7, [14, 5, 3, 3, 1, 1, 12], ["canon"]), E(333, "Cañón realista", "art", 14, 4, [14, 5, 3, 3, 1, 1, 12], ["canon"])
+  ];
+}
+Object.assign(BATTLES, {
+  chacabuco: {
+    id: "chacabuco", order: 3, title: "CHACABUCO", date: "12 de febrero de 1817",
+    blurb: "Tras cruzar los Andes, San Martin ataca a los realistas de la cuesta con dos columnas.",
+    map: CHA_MAP, leaderId: 1, leaderFall: "San Martin ha caido.", pName: "Ejército de los Andes", pBanner: "FASE DEL EJÉRCITO DE LOS ANDES",
+    units: chaUnits, decor: [], building: "rancho",
+    diff: { easy: { drop: [227, 228, 232], hpM: 0.8, strD: -1, pHp: 6 }, normal: { drop: [227], hpM: 0.9, strD: 0, pHp: 3 }, hard: { drop: [], hpM: 1, strD: 0, pHp: 0 } },
+    startLog: "El Ejército de los Andes sube la cuesta de Chacabuco.",
+    introHTML:
+      "<h1>CHACABUCO</h1><h3>12 de febrero de 1817</h3>" +
+      "<p>Tras cruzar la cordillera, San Martín lanza al Ejército de los Andes contra los realistas del coronel Rafael Maroto, atrincherados en la cuesta de Chacabuco. El plan es un ataque en pinza: O'Higgins de frente y Soler por la retaguardia.</p>" +
+      "<p><b>Objetivo:</b> derrota a todos los realistas.<br><b>Derrota:</b> si cae San Martín (★) o todo tu ejército.</p>" +
+      "<p class='help'><b>Consejos:</b> el <b>cerro</b> da +2 de defensa y +15 de esquive, y los realistas lo ocupan: busca los pasos del norte y del sur. En el <b>tercer turno</b> llegan <b>refuerzos</b> por el borde derecho, a la retaguardia enemiga.</p>",
+    intro: INTRO_C, epilogue: EPILOGUE_C, midLines: chaMid,
+    duel: { a: 202, b: 221, lines: [
+      { bg: "chacabuco", cap: "Cara a cara en la cuesta: O'Higgins y Maroto." },
+      { who: "ohi", side: "L", mood: "angry", text: "¡Por la libertad de Chile, coronel!" },
+      { who: "mar", side: "R", mood: "angry", text: "¡Por el Rey! ¡No pasarán la cuesta!" },
+      { who: "ohi", side: "L", mood: "serious", text: "Ya la pasamos, coronel. ¡Adelante!" }
+    ] },
+    turnEvents: { 3: { apply() { spawn(chaReinf()); log("¡Llega la división de Soler por la retaguardia!", "#ffd84a"); }, lines: chaLinesReinf } },
+    victoryHTML() {
+      return "<h1>¡VICTORIA!</h1><h3>El Ejército de los Andes abre el camino a Santiago</h3>" +
+        "<p>El 12 de febrero de 1817, tras cruzar la cordillera, el Ejército de los Andes derrotó a los realistas de Maroto en la cuesta de Chacabuco. La carga de O'Higgins y la llegada de la división de Soler por la retaguardia cerraron la trampa.</p>" +
+        "<p>Dos días después entraron en Santiago. San Martín rechazó el gobierno de Chile y el cargo recayó en O'Higgins.</p>";
+    },
+    defeatHTML: "<p>La historia fue distinta: el Ejército de los Andes venció. Evita subir de frente contra el cerro: rodéalo por el norte y el sur, usa el cañón y espera los refuerzos del tercer turno.</p>"
+  },
+  maipu: {
+    id: "maipu", order: 4, title: "MAIPÚ", date: "5 de abril de 1818",
+    blurb: "El Ejercito Unido se juega la libertad de Chile en los llanos cercanos a Santiago.",
+    map: MAI_MAP, leaderId: 1, leaderFall: "San Martin ha caido.", pName: "Ejército Unido", pBanner: "FASE DEL EJÉRCITO UNIDO",
+    units: maiUnits, decor: [], building: "rancho",
+    diff: { easy: { drop: [328, 330, 333, 326, 327], hpM: 0.8, strD: -1, pHp: 6 }, normal: { drop: [328, 330, 326, 333], hpM: 0.9, strD: 0, pHp: 3 }, hard: { drop: [328, 330], hpM: 1, strD: 0, pHp: 3 } },
+    startLog: "El Ejército Unido se forma en las lomas de Maipú.",
+    introHTML:
+      "<h1>MAIPÚ</h1><h3>5 de abril de 1818</h3>" +
+      "<p>Dos semanas después de la sorpresa de Cancha Rayada, San Martín reorganiza al ejército patriota y enfrenta al general Mariano Osorio en los llanos de Maipú, cerca de Santiago.</p>" +
+      "<p><b>Objetivo:</b> derrota a todos los realistas.<br><b>Derrota:</b> si cae San Martín (★) o todo tu ejército.</p>" +
+      "<p class='help'><b>Consejos:</b> las lomas dan +2 de defensa y +15 de esquive: los dos ejércitos tienen las suyas y el centro es llano y abierto. Los sembrados dan +10 de esquive. En el <b>segundo turno</b> llega un aliado herido pero decidido.</p>",
+    intro: INTRO_M, epilogue: EPILOGUE_M, midLines: maiMid,
+    duel: { a: 1, b: 321, lines: [
+      { bg: "maipu", cap: "Frente a frente: San Martín y el general Osorio." },
+      { who: "sm",  side: "L", mood: "serious", text: "Su campaña termina aquí, general Osorio." },
+      { who: "osr", side: "R", mood: "angry",   text: "¡Jamás! ¡Viva el Rey! ¡No me rendiré ante rebeldes!" },
+      { who: "sm",  side: "L", mood: "angry",   text: "Entonces que decida el campo de batalla." }
+    ] },
+    turnEvents: { 2: { apply() { spawn(maiReinf()); log("¡O'Higgins llega herido, pero decidido a pelear!", "#ffd84a"); }, lines: maiLinesReinf } },
+    victoryHTML() {
+      return "<h1>¡VICTORIA!</h1><h3>La batalla que aseguró la independencia de Chile</h3>" +
+        "<p>El 5 de abril de 1818, en los llanos de Maipú, el Ejército Unido derrotó a Osorio menos de tres semanas después del desastre de Cancha Rayada. Terminó con el dominio realista en Chile.</p>" +
+        "<p>Tras el combate, San Martín y O'Higgins se fundieron en el famoso Abrazo de Maipú. Con Chile libre, San Martín pudo preparar la expedición libertadora al Perú.</p>";
+    },
+    defeatHTML: "<p>La historia fue distinta: el Ejército Unido venció. Mantén tus lomas, deja que el enemigo cruce el llano bajo el fuego de tus cañones y cuida a O'Higgins cuando llegue.</p>"
+  }
+});
+
+let B = BATTLES.sanlorenzo;
+function setBattle(id) {
+  B = BATTLES[id]; MAP = B.map; units = makeUnits(); faceShown = null; locustActive = false;
+  for (const k in evFlags) evFlags[k] = false;
+}
+
+// ================= PANTALLAS =================
+function showMenu() {
+  const list = Object.values(BATTLES).sort((a, b) => a.order - b.order);
+  $box.innerHTML =
+    "<h1>BATALLAS ARGENTINAS</h1><h3>Táctica por turnos al estilo Fire Emblem</h3>" +
+    "<p class='help'>Elige una batalla de la historia argentina.</p>" +
+    list.map(b => "<button class='bcard' data-b='" + b.id + "'><b>" + b.title + "</b> · " + b.date + "<br><span>" + b.blurb + "</span></button>").join("") +
+    "<button id='howto'>¿Cómo se juega? (instructivo)</button>" +
+    "<p class='help' style='text-align:center'>Música: armonía de la Marcha de San Lorenzo.</p>";
+  $overlay.classList.remove("hidden");
+  $box.querySelectorAll(".bcard").forEach(btn => btn.onclick = () => { setBattle(btn.dataset.b); showBattleIntro(); });
+  document.getElementById("howto").onclick = openHelp;
+}
+function showBattleIntro() {
+  $box.innerHTML = B.introHTML +
+    "<p class='help'>Combate como en Fire Emblem: armas con poder, punteria y critico; ataque doble por velocidad; triangulo de armas. El instructivo explica todo.</p>" +
+    diffUI() +
+    "<button id='howto'>¿Cómo se juega? (instructivo)</button><button id='go'>Comenzar la batalla</button><button id='back'>Elegir otra batalla</button>";
+  $overlay.classList.remove("hidden"); bindDiff();
+  document.getElementById("howto").onclick = openHelp;
+  document.getElementById("back").onclick = showMenu;
+  document.getElementById("go").onclick = () => { setBattle(B.id); $overlay.classList.add("hidden"); startDialogue(B.intro, newGame); };
+}
+function showEnd(win, why) {
+  state = "over"; busy = true; $end.disabled = true;
+  const build = () => {
+    $box.innerHTML = win
+      ? B.victoryHTML() + diffUI() + "<button id='again'>Jugar de nuevo</button><button id='menu'>Elegir otra batalla</button>"
+      : "<h1>DERROTA</h1><h3>" + why + "</h3>" + B.defeatHTML + diffUI() + "<button id='again'>Reintentar</button><button id='menu'>Elegir otra batalla</button>";
+    $overlay.classList.remove("hidden"); bindDiff();
+    document.getElementById("again").onclick = () => { $overlay.classList.add("hidden"); setBattle(B.id); newGame(); };
+    document.getElementById("menu").onclick = showMenu;
+  };
+  if (win) startDialogue(B.epilogue, build); else build();
+}
+function newGame() {
+  units = makeUnits(); MAP = B.map; turn = 1; $log.innerHTML = ""; faceShown = null; scene = null; options = []; selW = null; locustActive = false;
+  for (const k in evFlags) evFlags[k] = false;
+  log(B.startLog);
+  startPlayerTurn();
+}
+setBattle("sanlorenzo"); turn = 1; state = "select";
+requestAnimationFrame(loop);
+showMenu();
+</script>
+</body>
+</html>
