@@ -78,6 +78,9 @@
   .slot .sinfo { flex:1 1 280px; font-size:13px; line-height:1.45; }
   .slot .sbtns { display:flex; gap:6px; } .slot .sbtns button { width:auto; padding:5px 12px; font-size:13px; margin:0; }
   .bcard { text-align:left; padding:10px 14px; margin-bottom:10px; font-size:16px; }
+  #pname { width:86%; font:inherit; font-size:20px; text-align:center; padding:8px; margin:6px 0 14px; background:#1b1410; color:#fff3d6; border:2px solid #e8c872; border-radius:3px; outline:none; }
+  #adviceBtn { background:linear-gradient(180deg,#3f8a4a,#2a6a34); }
+  #adviceBtn:hover { background:linear-gradient(180deg,#4fa05a,#33803f); }
   .bcard span { font-size:13px; font-weight:normal; color:#f1dfb0; }
 </style>
 </head>
@@ -91,6 +94,7 @@
     <div id="faceRow"><canvas id="face" width="192" height="192"></canvas><div class="panel" id="info">Pasa el mouse sobre una unidad.</div></div>
     <h2>REGISTRO</h2>
     <div class="panel" id="log"></div>
+    <button id="adviceBtn">Consejo (C)</button>
     <button id="endTurn">Terminar turno</button>
     <button id="saveBtn">Guardar / cargar partida</button>
     <button id="snd">Sonido: apagado</button>
@@ -458,10 +462,12 @@ function chooseWeapon(w) {
 cv.addEventListener("mousemove", e => { hover = cellFromEvent(e); mouse = pixelFromEvent(e); updateInfo(); });
 cv.addEventListener("contextmenu", e => { e.preventDefault(); cancel(); });
 window.addEventListener("keydown", e => {
-  if (dlg) { if (e.key === " " || e.key === "Enter") { e.preventDefault(); dlgAdvance(); } return; }
+  if (e.target && e.target.tagName === "INPUT") { if (e.key === "Enter") { const b = document.getElementById("nameok"); if (b) b.click(); } return; }
+  if (dlg) { if (e.key === " " || e.key === "Enter") { e.preventDefault(); dlgAdvance(); } else if (e.key === "Escape" && dlg.tactical) dlgEnd(); return; }
   if (helpOpen()) { if (e.key === "Escape" || e.key === "h" || e.key === "H") closeHelp(); return; }
   if (e.key === "h" || e.key === "H" || e.key === "?") { openHelp(); return; }
   if (e.key === "t" || e.key === "T") { toggleThreat(); return; }
+  if (e.key === "c" || e.key === "C") { openAdvice(); return; }
   if (e.key === "Escape") cancel();
 });
 $end.addEventListener("click", () => { Snd.sfx("blip"); endPlayerTurn(); });
@@ -470,6 +476,7 @@ document.getElementById("helpBtn").addEventListener("click", openHelp);
 document.getElementById("saveBtn").addEventListener("click", () => showSaves(false));
 document.getElementById("helpClose").addEventListener("click", closeHelp);
 document.getElementById("threatBtn").addEventListener("click", toggleThreat);
+document.getElementById("adviceBtn").addEventListener("click", () => openAdvice());
 cv.addEventListener("click", e => {
   if (dlg) { const m = pixelFromEvent(e); if (m.x > 546 && m.x < 632 && m.y > 10 && m.y < 36) dlgEnd(); else dlgAdvance(); return; }
   if (scene) { skipScene = true; return; }
@@ -1005,7 +1012,7 @@ function menuDef() {
 // ----- ventana de pronostico (como Fire Emblem) -----
 function draw(t) {
   ctx.setTransform(RES, 0, 0, RES, 0, 0);
-  if (dlg) { drawDialogue(t); return; }
+  if (dlg && !dlg.tactical) { drawDialogue(t); return; }
   if (scene) { drawScene(t); return; }
   ctx.drawImage(buildGround(), 0, 0, W * TS, H * TS);
   drawWaterAll(t);
@@ -1029,14 +1036,15 @@ function draw(t) {
   drawMapFx(t);
   drawAtmosphere(t);
   if (selected && state !== "walk") { ctx.strokeStyle = "rgba(255,255,255," + (0.6 + 0.3 * Math.sin(t / 200)).toFixed(2) + ")"; ctx.lineWidth = 2; ctx.strokeRect(selected.x * TS + 1, selected.y * TS + 1, TS - 2, TS - 2); }
-  if (inMap(hover.x, hover.y) && state !== "enemy" && state !== "walk") drawCursor(hover.x, hover.y, t);
-  drawTerrainWindow();
+  if (!dlg && inMap(hover.x, hover.y) && state !== "enemy" && state !== "walk") drawCursor(hover.x, hover.y, t);
+  if (!dlg) drawTerrainWindow();
   drawMenu();
   if (state === "target" && targets && selW) {                                   // pronostico al pasar sobre un enemigo
     const hu = inMap(hover.x, hover.y) ? unitAt(hover.x, hover.y) : null;
     if (hu && targets.includes(hu)) drawForecast(preview(selected, selW, hu), hu);
   }
-  drawBanner(t);
+  if (!dlg) drawBanner(t);
+  if (dlg && dlg.tactical) drawAdvice(t);
 }
 function loop(t) { draw(t); requestAnimationFrame(loop); }
 
@@ -1669,7 +1677,7 @@ function dlgApply() {
   if (ln.who) { dlg[ln.side] = ln.who; dlg.mood[ln.side] = ln.mood || "neutral"; dlg.speaker = ln.who; dlg.side = ln.side; } else dlg.speaker = null;
 }
 function dlgAdvance() {
-  const ln = dlg.lines[dlg.i], full = (ln.text || ln.cap).length;
+  const ln = dlg.lines[dlg.i], full = lineText(ln).length;
   if (dlg.chars < full) { dlg.chars = full; return; }
   if (++dlg.i >= dlg.lines.length) { dlgEnd(); return; }
   Snd.sfx("blip"); dlgApply();
@@ -1734,6 +1742,7 @@ const HELP_HTML =
   "<h2>Cerros y refuerzos (Chacabuco y Maipú)</h2><ul><li>El <b>cerro</b> da +2 de defensa y +15 de esquive, pero cuesta más moverse. Los realistas lo ocupan: busca los pasos y rodéalo.</li><li>Algunas batallas traen <b>refuerzos</b> en un turno fijo (te lo avisa el consejo inicial): aparecen en el mapa y pueden actuar ese mismo turno.</li></ul>" +
   "<h2>Otros controles</h2><ul>" +
   "<li><b>Espacio / Enter / clic:</b> avanzar los diálogos. <b>Saltar:</b> botón arriba a la derecha.</li>" +
+  "<li><b>Consejo (botón verde o tecla C):</b> el general vuelve a explicarte la estrategia de la batalla y, a partir del segundo turno, te señala a quién conviene atacar ahora.</li>" +
   "<li><b>Clic durante un combate:</b> lo acelera. <b>H:</b> abre este instructivo. <b>T:</b> amenaza enemiga.</li>" +
   "<li><b>Dificultad:</b> se elige al empezar o al reintentar. En <i>Fácil</i> hay menos enemigos y tus unidades tienen más vida.</li></ul>" +
   "<p class='help'>Sonido (botón del panel): en San Lorenzo suena la Marcha de San Lorenzo (grabación en la carpeta assets); en las demás batallas, música sintetizada.</p>";
@@ -2348,7 +2357,7 @@ function drawBackdrop(kind, t, rel, ph) {
   drawDayField(t);
 }
 function drawDialogue(t) {
-  const d = dlg, ln = d.lines[d.i], full = ln.text || ln.cap;
+  const d = dlg, ln = d.lines[d.i], full = lineText(ln);
   if (!sceneCache.__cloud) { const cl = document.createElement("canvas"); cl.width = 200; cl.height = 90; const cg = cl.getContext("2d"); for (const [dx, dy, r] of [[50, 54, 26], [80, 44, 32], [116, 50, 28], [146, 58, 22], [34, 62, 18], [98, 62, 26]]) { const q = cg.createRadialGradient(dx - r * 0.3, dy - r * 0.4, 2, dx, dy, r); q.addColorStop(0, "rgba(255,255,255,.95)"); q.addColorStop(0.7, "rgba(246,248,252,.85)"); q.addColorStop(1, "rgba(214,226,240,0)"); cg.fillStyle = q; cg.beginPath(); cg.arc(dx, dy, r, 0, 7); cg.fill(); } sceneCache.__cloud = cl; }
   drawBackdrop(d.bg, t, performance.now() - d.lineStart, d.ph);
   const dt = Math.min(60, t - d.last); d.last = t;
@@ -3128,6 +3137,7 @@ function setBattle(id) {
   for (const k in evFlags) evFlags[k] = false;
   if (typeof Snd !== "undefined" && Snd.on) Snd.startMusic();
   document.querySelector("#dateplate .dp-t").textContent = "BATALLA DE " + B.title; document.querySelector("#dateplate .dp-d").textContent = B.date;
+  const adv = document.getElementById("adviceBtn"); if (adv) { adv.style.display = B.advice ? "" : "none"; if (B.advice) adv.textContent = "Consejo de " + (ADVISER[B.advice[0].who] || "tu general") + " (C)"; }
   const gg = BATTLE_GEO[B.id]; document.querySelector("#dateplate .dp-p").textContent = gg ? gg.place + " · " + gg.country : "";
 }
 
@@ -3137,6 +3147,175 @@ const Save = {                                                     // progreso g
   get(k, d) { try { const v = localStorage.getItem("ba_" + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem("ba_" + k, JSON.stringify(v)); } catch (e) {} }
 };
+// ================= NOMBRE DEL JUGADOR Y CONSEJOS DE BATALLA (estilo Fire Emblem) =================
+let playerName = "Soldado";
+const ADVISER = { sm: "San Martín", bel: "Belgrano" };
+const lineText = ln => (ln.text || ln.cap || "").replace(/\{N\}/g, playerName);
+function askName(done, cancelable) {
+  $box.classList.remove("wide");
+  $box.innerHTML = "<h1>BATALLAS ARGENTINAS</h1><h3>Antes de comenzar...</h3>" +
+    "<p style='text-align:center'>Los generales de la Patria necesitan saber con quién hablan.<br><b>¿Cómo te llamás?</b></p>" +
+    "<input id='pname' type='text' maxlength='18' autocomplete='off' placeholder='Tu nombre' value=\"" + (cancelable ? playerName : "") + "\">" +
+    "<button id='nameok'>Aceptar</button>" + (cancelable ? "<button id='namecancel'>Volver</button>" : "");
+  $overlay.classList.remove("hidden");
+  const inp = document.getElementById("pname"); inp.focus(); inp.select();
+  document.getElementById("nameok").onclick = () => {
+    const v = inp.value.replace(/[<>&"'`\\]/g, "").trim().slice(0, 18);
+    if (!v) { inp.style.borderColor = "#e0553a"; inp.focus(); return; }
+    playerName = v; Save.set("name", v); Snd.sfx("blip"); done();
+  };
+  const nc = document.getElementById("namecancel"); if (nc) nc.onclick = done;
+}
+function startAdvice(lines, done) {
+  startDialogue(lines.map(l => Object.assign({ side: "L", mood: "serious" }, l)), done);
+  dlg.tactical = true; dlg.n = lines.length;
+}
+function liveTip() {                                              // consejo segun como esta la batalla ahora
+  const who = B.advice[0].who, foes = alive().filter(u => u.team === "e"), mine = alive().filter(u => u.team === "p");
+  const lead = units.find(u => u.id === B.leaderId), out = [];
+  if (!foes.length) return out;
+  let pri = foes.filter(u => u.cls === "art"), why = "los cañones: pegan muy fuerte a 2 o 3 casillas y son frágiles; de cerca no pueden contraatacar.";
+  if (!pri.length) { pri = foes.filter(u => u.cls === "cav"); why = "los dragones: son rápidos y, si los deja, nos flanquean."; }
+  if (!pri.length) {
+    const nl = foes.filter(u => !u.leader), pool = nl.length ? nl : foes, m = Math.min(...pool.map(u => u.hp));
+    pri = pool.filter(u => u.hp === m); why = nl.length ? "el más herido: rematarlo es un golpe menos que recibimos." : "su jefe: sin él, se acaba la resistencia.";
+  }
+  const w = pri[0].weapons[0] ? pri[0].weapons[0].type : "";
+  const hint = { axe: "Es de machete: el sable lo vence.", lance: "Tiene bayoneta o lanza: vence al sable, péguele de lejos (carabina, fusil o cañón).", sword: "Es de sable: lo vencen la bayoneta y la lanza.", cannon: "No puede contraatacar de cerca: atáquelo cuerpo a cuerpo." }[w] || "";
+  out.push({ who, mood: "serious", text: "Turno " + turn + ", {N}. Nos quedan " + mine.length + " unidades contra " + foes.length + ". Prioridad ahora: " + why + " " + hint, hl: [{ t: "u", ids: pri.map(u => u.id), col: "red", tag: "Objetivo" }] });
+  if (lead && lead.hp <= lead.maxhp * 0.6) out.push({ who, mood: "sad", text: "Ojo, {N}: nuestro general está herido (" + lead.hp + "/" + lead.maxhp + " PV). Sáquelo de la línea de fuego y que otros hagan el trabajo. Si cae, perdemos.", hl: [{ t: "u", ids: [lead.id], col: "green", tag: "Proteger" }] });
+  else {
+    const wd = mine.filter(u => !u.leader && u.hp <= u.maxhp * 0.4);
+    if (wd.length) out.push({ who, mood: "serious", text: "Hay hombres muy heridos. Retírelos detrás de la línea o déjelos en un monte: una unidad perdida es menos fuerza para el golpe final.", hl: [{ t: "u", ids: wd.map(u => u.id), col: "green", tag: "Heridos" }] });
+  }
+  return out;
+}
+function adviceLines(replay) {
+  let L = B.advice.slice();
+  if (!replay) return L;
+  L = L.filter(l => !l.early);
+  return liveTip().concat([{ who: B.advice[0].who, mood: "smile", text: "Repasemos el plan completo, {N}. Si ya lo tiene claro, toque «Cerrar» arriba a la derecha." }], L);
+}
+function openAdvice() {
+  if (!B.advice || dlg || scene || busy || state !== "select" || helpOpen() || !$overlay.classList.contains("hidden")) return;
+  Snd.sfx("blip"); selected = null; moveMap = null; targets = null;
+  startAdvice(adviceLines(turn > 1 || alive().some(u => u.acted)), null);
+}
+function drawAdvice(t) {
+  const d = dlg, ln = d.lines[d.i], full = lineText(ln), hls = ln.hl || [];
+  const dt = Math.min(60, t - d.last); d.last = t;
+  if (d.chars < full.length) { d.chars = Math.min(full.length, d.chars + dt * 0.07); const k = Math.floor(d.chars / 2); if (k !== d.lastTick) { d.lastTick = k; Snd.sfx("text"); } }
+  ctx.fillStyle = "rgba(6,10,26,.36)"; ctx.fillRect(0, 0, W * TS, H * TS);
+  const COL = { gold: "#ffd84a", red: "#ff6a58", blue: "#6ab0ff", green: "#74e690" };
+  const pulse = 0.5 + 0.5 * Math.sin(t / 260), tags = []; let sy = 0, sn = 0;
+  for (const h of hls) {
+    const c = COL[h.col || "gold"];
+    if (h.t === "z") {
+      const [rx, ry, rw, rh] = h.r, X = rx * TS, Y = ry * TS, Wd = rw * TS, Ht = rh * TS;
+      ctx.globalAlpha = 0.16 + 0.12 * pulse; ctx.fillStyle = c; ctx.fillRect(X, Y, Wd, Ht); ctx.globalAlpha = 1;
+      ctx.strokeStyle = c; ctx.lineWidth = 2.5; ctx.setLineDash([9, 6]); ctx.lineDashOffset = -t / 50; ctx.strokeRect(X + 1, Y + 1, Wd - 2, Ht - 2); ctx.setLineDash([]);
+      if (h.tag) tags.push({ x: X + Wd / 2, y: Y > 26 ? Y - 6 : Y + Ht + 17, s: h.tag, c });
+      sy += ry + rh / 2; sn++;
+    } else if (h.t === "u") {
+      let first = true;
+      for (const id of h.ids) {
+        const u = units.find(q => q.id === id && q.hp > 0); if (!u) continue;
+        const X = u.x * TS, Y = u.y * TS, bob = Math.sin(t / 180) * 3;
+        ctx.globalAlpha = 0.14 + 0.14 * pulse; ctx.fillStyle = c; ctx.fillRect(X, Y, TS, TS); ctx.globalAlpha = 1;
+        ctx.strokeStyle = c; ctx.lineWidth = 3; ctx.lineCap = "round";
+        for (const [cx, cy, sx, sY] of [[X + 1, Y + 1, 1, 1], [X + TS - 1, Y + 1, -1, 1], [X + 1, Y + TS - 1, 1, -1], [X + TS - 1, Y + TS - 1, -1, -1]]) { ctx.beginPath(); ctx.moveTo(cx + sx * 11, cy); ctx.lineTo(cx, cy); ctx.lineTo(cx, cy + sY * 11); ctx.stroke(); }
+        ctx.fillStyle = "#000"; ctx.beginPath(); ctx.moveTo(X + TS / 2 - 8, Y - 15 + bob); ctx.lineTo(X + TS / 2 + 8, Y - 15 + bob); ctx.lineTo(X + TS / 2, Y - 2 + bob); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(X + TS / 2 - 6, Y - 13 + bob); ctx.lineTo(X + TS / 2 + 6, Y - 13 + bob); ctx.lineTo(X + TS / 2, Y - 4 + bob); ctx.closePath(); ctx.fill();
+        if (first && h.tag) { tags.push({ x: X + TS / 2, y: Y > 40 ? Y - 20 : Y + TS + 17, s: h.tag, c }); first = false; }
+        sy += u.y; sn++;
+      }
+    } else if (h.t === "a") {
+      const x1 = h.from[0] * TS + TS / 2, y1 = h.from[1] * TS + TS / 2, x2 = h.to[0] * TS + TS / 2, y2 = h.to[1] * TS + TS / 2, ang = Math.atan2(y2 - y1, x2 - x1);
+      const ex = x2 - Math.cos(ang) * 10, ey = y2 - Math.sin(ang) * 10;
+      ctx.lineCap = "round"; ctx.setLineDash([11, 8]); ctx.lineDashOffset = -t / 35;
+      ctx.strokeStyle = "rgba(0,0,0,.65)"; ctx.lineWidth = 8; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(ex, ey); ctx.stroke();
+      ctx.strokeStyle = c; ctx.lineWidth = 4.5; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(ex, ey); ctx.stroke(); ctx.setLineDash([]);
+      for (const [k, col] of [[1.35, "#000"], [1, c]]) {
+        ctx.fillStyle = col; ctx.beginPath();
+        ctx.moveTo(x2 + Math.cos(ang) * 6 * k, y2 + Math.sin(ang) * 6 * k);
+        ctx.lineTo(x2 - Math.cos(ang) * 14 * k + Math.cos(ang + 1.57) * 10 * k, y2 - Math.sin(ang) * 14 * k + Math.sin(ang + 1.57) * 10 * k);
+        ctx.lineTo(x2 - Math.cos(ang) * 14 * k - Math.cos(ang + 1.57) * 10 * k, y2 - Math.sin(ang) * 14 * k - Math.sin(ang + 1.57) * 10 * k);
+        ctx.closePath(); ctx.fill();
+      }
+      if (h.tag) tags.push({ x: (x1 + x2) / 2, y: (y1 + y2) / 2 - 10, s: h.tag, c });
+      sy += (h.from[1] + h.to[1]) / 2; sn++;
+    }
+  }
+  ctx.font = "bold 12px Georgia"; ctx.textAlign = "center";
+  for (const g of tags) {
+    const w = ctx.measureText(g.s).width + 14, x = clamp(g.x - w / 2, 4, 636 - w), y = g.y - 12;
+    ctx.fillStyle = "rgba(20,14,8,.9)"; ctx.strokeStyle = g.c; ctx.lineWidth = 1.5; rrect(ctx, x, y, w, 18, 5); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#fff3d0"; ctx.fillText(g.s, x + w / 2, y + 13);
+  }
+  ctx.textAlign = "left";
+  const bw = 620, bh = 126, bx = 10, top = sn > 0 && sy / sn > 5.3, by = top ? 44 : 440 - bh - 8;
+  ctx.globalAlpha = 0.96; uiPanel(bx, by, bw, bh, { top: "#1f3170", bot: "#0b1230" }); ctx.globalAlpha = 1;
+  const sp = SPK[ln.who], mood = ln.mood || "serious";
+  drawPortrait(ctx, unitForSpeaker(sp.unit), bx + 14, by + 15, 96, mood);
+  ctx.strokeStyle = "#e8c872"; ctx.lineWidth = 3; ctx.strokeRect(bx + 14, by + 15, 96, 96);
+  ctx.font = "bold 15px Georgia"; ctx.fillStyle = "#ffe9a8"; ctx.fillText(sp.name, bx + 126, by + 27);
+  ctx.textAlign = "right"; ctx.font = "12px Georgia"; ctx.fillStyle = "#b9a77a"; ctx.fillText("CONSEJO DE BATALLA  " + (d.i + 1) + "/" + d.lines.length, bx + bw - 18, by + 26); ctx.textAlign = "left";
+  let fs = 17, rows; ctx.font = fs + "px Georgia"; rows = wrapText(full, bw - 126 - 24);
+  if (rows.length > 4) { fs = 15; ctx.font = fs + "px Georgia"; rows = wrapText(full, bw - 126 - 24); }
+  let left = Math.floor(d.chars); ctx.fillStyle = "#f8f2de";
+  rows.forEach((r, i) => { ctx.fillText(r.slice(0, Math.max(0, left)), bx + 126, by + 52 + i * (fs + 5)); left -= r.length + 1; });
+  if (d.chars >= full.length) { const bob = Math.sin(t / 220) * 2.5; ctx.fillStyle = "#e8c872"; ctx.beginPath(); ctx.moveTo(bx + bw - 34, by + bh - 20 + bob); ctx.lineTo(bx + bw - 22, by + bh - 20 + bob); ctx.lineTo(bx + bw - 28, by + bh - 12 + bob); ctx.closePath(); ctx.fill(); }
+  drawDatePlate(8, 6);
+  uiPanel(542, 8, 92, 28, { top: "#3a3a4c", bot: "#1a1a26", edge: "#8a7a52" });
+  ctx.font = "13px Georgia"; ctx.fillStyle = "#e8dcb0"; ctx.textAlign = "center"; ctx.fillText("Cerrar ✕", 588, 27); ctx.textAlign = "left";
+}
+
+// ----- consejos de cada batalla: hl = resaltados en el mapa (z zona, u unidades, a flecha) -----
+const Z = (r, col, tag) => ({ t: "z", r, col, tag }), U = (ids, col, tag) => ({ t: "u", ids, col, tag }), A = (from, to, col, tag) => ({ t: "a", from, to, col, tag });
+BATTLES.sanlorenzo.advice = [
+  { who: "sm", mood: "serious", early: true, text: "Ayudante {N}, escúcheme bien: son 250 realistas contra 120 de los nuestros. No ganaremos de frente: ganaremos con la sorpresa y golpeando en el lugar justo.", hl: [Z([9, 2, 5, 6], "red", "Desembarco realista")] },
+  { who: "sm", mood: "serious", early: true, text: "Estos son mis granaderos: todos de caballería, rápidos, pero pocos. Cada hombre cuenta; no regale ninguno.", hl: [U([1, 2, 3, 4, 5, 6, 7], "blue", "Granaderos")] },
+  { who: "sm", mood: "serious", early: true, text: "Primer turno: no salgan a buscarlos. Quédense detrás del convento y de los montes, fuera de su alcance. Apriete «Amenaza enemiga» (tecla T) y no pise el rojo. Que ellos lleguen cansados.", hl: [Z([0, 2, 4, 7], "blue", "Esperen aquí")] },
+  { who: "sm", mood: "angry", text: "Lo más peligroso son sus cañones: pegan fuerte de 2 a 3 casillas, pero son frágiles y de cerca no pueden contraatacar. Apenas pueda, caiga sobre ellos con la caballería.", hl: [U([15, 16], "red", "Cañones: primero")] },
+  { who: "sm", mood: "serious", text: "Entre los infantes: los del machete caen ante el sable. Los de bayoneta le ganan al sable; a esos pégueles con la carabina desde 2 casillas, o déjelos para el final.", hl: [U([12, 14, 19], "red", "Machete: use sable"), U([11, 13, 18], "gold", "Bayoneta: carabina")] },
+  { who: "sm", mood: "smile", text: "Ábrase por el norte y por el sur, pegado a los bordes, y encierre sus flancos. Dos o tres jinetes sobre el mismo enemigo lo eliminan antes de que pueda responder.", hl: [A([4, 2], [12, 3], "gold", "Por el norte"), A([4, 8], [12, 7], "gold", "Por el sur")] },
+  { who: "sm", mood: "serious", text: "Aproveche los montes: dan +1 de defensa y +20 de esquive. Termine el movimiento ahí cuando pueda recibir un golpe.", hl: [Z([5, 4, 1, 1], "green", "Monte"), Z([6, 5, 1, 1], "green"), Z([8, 3, 1, 1], "green"), Z([8, 6, 1, 1], "green")] },
+  { who: "sm", mood: "sad", text: "Y a mí no me exponga: si caigo, se acaba todo. Úseme para rematar, nunca de primer escalón.", hl: [U([1], "green", "No exponer")] },
+  { who: "sm", mood: "smile", text: "Zabala, su jefe, queda para el final. ¡Adelante, {N}! Si necesita que se lo repita, toque «Consejo» (tecla C).", hl: [U([17], "red", "Jefe: al final")] }
+];
+BATTLES.tucuman.advice = [
+  { who: "bel", mood: "serious", early: true, text: "Ayudante {N}, me ordenaron retirarme hasta Córdoba, pero me quedo: aquí detendremos a Tristán. Somos pocos y nos dobla en número, así que hay que pelear con cabeza.", hl: [Z([10, 2, 4, 6], "red", "Ejército de Tristán")] },
+  { who: "bel", mood: "serious", text: "El arroyo parte el campo en dos y solo se cruza por el vado de tres casillas. Ahí se decide todo. No salgamos a buscarlos: hagamos que vengan a nosotros.", hl: [Z([8, 4, 1, 3], "gold", "El vado")] },
+  { who: "bel", mood: "serious", text: "Nuestro cañón cubre el vado. No lo adelante, y póngale infantes delante: si lo pierde, perdemos la mejor arma que tenemos para frenar su avance.", hl: [U([109], "blue", "Cañón"), U([107, 108], "blue", "Infantes")] },
+  { who: "bel", mood: "smile", text: "Los gauchos llevan boleadoras: si aciertan, el enemigo pierde 2 de movimiento ese turno. Frene a los que crucen y luego rematamos. Y retire al que está pegado al vado: está demasiado expuesto.", hl: [U([104, 105, 106], "blue", "Boleadoras"), U([106], "red")] },
+  { who: "bel", mood: "serious", text: "Las armas importan: la lanza vence al sable, y los dragones enemigos llevan sable. Díaz Vélez y los gauchos de lanza son para ellos. Mi sable vence al machete; a los de bayoneta, cañón o carabina de lejos.", hl: [U([102, 104, 106], "blue", "Lanzas"), U([118, 119], "red", "Dragones: sable")] },
+  { who: "bel", mood: "angry", text: "Sus cañones son frágiles y pegan fuerte. En cuanto crucen, ataque primero a los dragones y a los cañones; después ya veremos a la infantería.", hl: [U([120, 121], "red", "Cañones")] },
+  { who: "bel", mood: "serious", text: "Cuidado con la orilla: los fusiles alcanzan 2 casillas aun a través del agua. No se quede ahí si no va a golpear.", hl: [Z([7, 4, 1, 3], "red", "Orilla peligrosa")] },
+  { who: "bel", mood: "smile", text: "Tenga paciencia hasta el tercer turno: cuentan que una manga de langostas caerá sobre ellos y los desordenará. Ese es el momento de contraatacar con todo.", hl: [] },
+  { who: "bel", mood: "sad", text: "A mí protéjame: si caigo, perdemos. Pío Tristán queda para el final. ¡La Virgen de la Merced nos acompaña! Si necesita repaso, toque «Consejo» (tecla C).", hl: [U([101], "green", "No exponer"), U([111], "red", "Jefe: al final")] }
+];
+BATTLES.chacabuco.advice = [
+  { who: "sm", mood: "serious", early: true, text: "Ayudante {N}, cruzamos los Andes y Maroto nos espera atrincherado en la cuesta. No subiremos a pelear de frente contra el cerro: el que sube, pierde.", hl: [Z([7, 1, 7, 9], "red", "Cerro: +2 Def, +15 esquive")] },
+  { who: "sm", mood: "serious", text: "Dos cosas del cerro: da +2 de defensa y +15 de esquive a quien lo ocupa, y a nuestra caballería le cuesta 3 de movimiento cada casilla. Rodéelo, no lo escale.", hl: [] },
+  { who: "sm", mood: "smile", text: "El plan es una pinza: nosotros de frente, y en el tercer turno Soler cae por la retaguardia, por el borde derecho. Entonces los encerramos.", hl: [A([5, 5], [8, 5], "blue", "Frente"), Z([14, 3, 2, 5], "green", "Llega Soler (turno 3)")] },
+  { who: "sm", mood: "serious", early: true, text: "Hasta entonces, no se apure. Aguanten en las faldas del oeste, junto a los montes, y deje que vengan a ustedes. Si se quedan arriba, rodéelos.", hl: [Z([3, 3, 4, 5], "blue", "Aguanten aquí")] },
+  { who: "ohi", mood: "serious", text: "Yo sostengo el frente con la infantería, {N}. Nosotros recibimos; ustedes caen por los lados. Y avíseme cuando asome Soler.", hl: [U([202, 205, 208, 209, 210], "blue", "Infantería")] },
+  { who: "sm", mood: "smile", text: "La caballería de Necochea y los granaderos va por los pasos del norte y del sur, donde el cerro se angosta. Ahí sí puede abrirse y caer sobre los flancos.", hl: [A([4, 0], [14, 1], "gold", "Paso norte"), A([4, 10], [14, 9], "gold", "Paso sur"), U([204, 206, 207], "blue", "Caballería")] },
+  { who: "sm", mood: "angry", text: "Derribe primero a sus cañones y dragones cuando bajen o queden al alcance: los cañones son débiles de cerca. Contra los dragones de sable, use la bayoneta.", hl: [U([231, 232], "red", "Cañones"), U([229, 230], "red", "Dragones")] },
+  { who: "sm", mood: "serious", text: "Nuestro cañón de montaña es lento: acérquelo a las faldas y protéjalo; es nuestra mejor respuesta al cerro.", hl: [U([212], "blue", "Cañón de montaña")] },
+  { who: "sm", mood: "smile", text: "A mí, detrás del frente: yo remato, no abro paso. Maroto queda para el final. ¡Adelante, {N}! Con «Consejo» (tecla C) le repito el plan.", hl: [U([1], "green", "No exponer"), U([221], "red", "Jefe: al final")] }
+];
+BATTLES.maipu.advice = [
+  { who: "sm", mood: "serious", early: true, text: "Ayudante {N}, hace tres semanas nos sorprendieron en Cancha Rayada. Hoy Osorio cree que estamos vencidos. Se equivoca: aquí se juega la libertad de Chile.", hl: [Z([11, 1, 4, 9], "red", "Ejército de Osorio")] },
+  { who: "sm", mood: "serious", text: "Tenemos dos lomas, al norte y al sur: dan +2 de defensa y +15 de esquive. Que sean los pilares de nuestra línea, con cañones y soldados encima.", hl: [Z([2, 2, 3, 2], "blue", "Loma norte"), Z([2, 7, 3, 2], "blue", "Loma sur")] },
+  { who: "sm", mood: "smile", text: "El centro es llano y abierto, con dos sembrados que dan algo de esquive. Que Osorio cruce esa llanura bajo el fuego de mis cañones y de la infantería; cuando lleguen desordenados, cargan los jinetes.", hl: [Z([6, 3, 5, 5], "gold", "Que crucen la llanura")] },
+  { who: "sm", mood: "serious", text: "Los cañones pegan fuerte de 2 a 3 casillas: déjelos en las lomas y no los deje solos, o los dragones los barren.", hl: [U([215, 216], "blue", "Nuestros cañones")] },
+  { who: "sm", mood: "serious", text: "Sus dragones, con sable, caen ante la bayoneta: que nuestros soldados de los Andes los reciban. Los infantes de machete caen ante el sable: son para granaderos y Balcarce.", hl: [U([329, 330], "red", "Dragones: bayoneta"), U([324, 326], "red", "Machete: sable"), U([211, 212, 213, 214], "blue", "Bayonetas"), U([207, 208, 209, 210], "blue", "Sables")] },
+  { who: "sm", mood: "angry", text: "Sus cañones están atrás, junto a Osorio. Cuando su línea ceda, abra por el norte y el sur y tómelos desde el costado: de cerca no pueden defenderse.", hl: [U([331, 332, 333], "red", "Cañones"), A([6, 1], [12, 1], "gold"), A([6, 9], [12, 9], "gold")] },
+  { who: "sm", mood: "sad", text: "En el segundo turno llega O'Higgins, herido. Es valiente pero está débil: póngalo detrás de la línea, que dispare y que no reciba golpes.", hl: [Z([0, 4, 2, 3], "green", "O'Higgins llega (turno 2)")] },
+  { who: "sm", mood: "smile", text: "A mí no me exponga: si caigo, Chile cae. Osorio queda para el final. ¡Que la Patria nos ayude, {N}! Toque «Consejo» (tecla C) para que se lo repita.", hl: [U([1], "green", "No exponer"), U([321], "red", "Jefe: al final")] }
+];
+
 const BATTLE_GEO = {
   tucuman:    { place: "Campo de las Carreras, San Miguel de Tucumán", region: "provincia de Tucumán", country: "Argentina", lon: -65.22, lat: -26.83, then: "En 1812, el norte del actual territorio argentino era la frontera con el Virreinato del Perú, en manos realistas." },
   sanlorenzo: { place: "Convento de San Carlos, San Lorenzo", region: "provincia de Santa Fe", country: "Argentina", lon: -60.74, lat: -32.75, then: "En 1813, a orillas del río Paraná, los realistas de Montevideo hostigaban los pueblos de la costa." },
@@ -3247,7 +3426,7 @@ function showMenu() {
   const sb = BATTLES[menuSel], sg = BATTLE_GEO[sb.id], un = isUnlocked(sb);
   $box.classList.add("wide");
   $box.innerHTML =
-    "<h1>BATALLAS ARGENTINAS</h1><h3>Táctica por turnos al estilo Fire Emblem</h3>" +
+    "<h1>BATALLAS ARGENTINAS</h1><h3>Táctica por turnos al estilo Fire Emblem<br><span style='font-size:13px'>Comandante <b style='color:#ffe9a8'>" + playerName + "</b> · <a href='#' id='chname' style='color:#ffe08a'>cambiar nombre</a></span></h3>" +
     "<div class='modes'><button class='mbtn" + (camp ? " sel" : "") + "' data-m='campaign'>Campaña cronológica</button><button class='mbtn" + (camp ? "" : " sel") + "' data-m='free'>Batalla libre</button></div>" +
     "<p class='help' style='text-align:center;margin:4px 0 8px'>" + (camp ? "Cada batalla se desbloquea al ganar la anterior, en orden cronológico." : "Elegí cualquier batalla, en el orden que quieras.") + "</p>" +
     "<div class='menu2'><div class='tl'>" + tl + "</div><div class='mapcol'><canvas id='mapc' width='380' height='490'></canvas><div class='mapnote'>Mapa esquemático · tocá un número para elegir la batalla</div></div></div>" +
@@ -3264,6 +3443,7 @@ function showMenu() {
   cvs.onclick = ev => { const p = pinAt(cvs, ev); if (p && isUnlocked(BATTLES[p.id])) { menuSel = p.id; showMenu(); } };
   document.getElementById("playsel").onclick = () => { if (!isUnlocked(BATTLES[menuSel])) return; setBattle(menuSel); showBattleIntro(); };
   document.getElementById("howto").onclick = openHelp;
+  document.getElementById("chname").onclick = e => { e.preventDefault(); askName(showMenu, true); };
   document.getElementById("loadgame").onclick = () => showSaves(true);
   const rc = document.getElementById("resetc");
   if (rc) rc.onclick = () => { if (!resetArmed) { resetArmed = 1; showMenu(); } else { Save.set("done", []); resetArmed = 0; menuSel = null; showMenu(); } };
@@ -3331,8 +3511,8 @@ function showEnd(win, why) {
     $box.classList.remove("wide");
     const extra = win && camp ? (nxt ? "<button id='next'>Siguiente batalla: " + nxt.title + " (" + nxt.date + ")</button>" : "<p class='help' style='text-align:center'>¡Completaste la campaña!</p>") : "";
     $box.innerHTML = win
-      ? B.victoryHTML() + diffUI() + extra + "<button id='again'>Jugar de nuevo</button><button id='menu'>Cronología y mapa</button>"
-      : "<h1>DERROTA</h1><h3>" + why + "</h3>" + B.defeatHTML + diffUI() + "<button id='again'>Reintentar</button><button id='menu'>Cronología y mapa</button>";
+      ? B.victoryHTML() + "<p>¡Bien peleado, <b>" + playerName + "</b>! La Patria le agradece.</p>" + diffUI() + extra + "<button id='again'>Jugar de nuevo</button><button id='menu'>Cronología y mapa</button>"
+      : "<h1>DERROTA</h1><h3>" + why + "</h3>" + B.defeatHTML + "<p>No se rinda, <b>" + playerName + "</b>: la historia se escribe intentando de nuevo. Toque «Consejo» en la batalla para repasar el plan.</p>" + diffUI() + "<button id='again'>Reintentar</button><button id='menu'>Cronología y mapa</button>";
     $overlay.classList.remove("hidden"); bindDiff();
     document.getElementById("again").onclick = () => { $overlay.classList.add("hidden"); setBattle(B.id); newGame(); };
     document.getElementById("menu").onclick = () => { menuSel = null; showMenu(); };
@@ -3344,11 +3524,13 @@ function newGame() {
   units = makeUnits(); MAP = B.map; turn = 1; $log.innerHTML = ""; faceShown = null; scene = null; options = []; selW = null; locustActive = false;
   for (const k in evFlags) evFlags[k] = false;
   log(B.startLog);
-  startPlayerTurn();
+  if (B.advice && !fastMode) { state = "select"; busy = true; startAdvice(adviceLines(false), () => { busy = false; startPlayerTurn(); }); }
+  else startPlayerTurn();
 }
 setBattle("sanlorenzo"); turn = 1; state = "select";
 requestAnimationFrame(loop);
-showMenu();
+playerName = Save.get("name", "");
+if (playerName) showMenu(); else askName(showMenu, false);
 </script>
 </body>
 </html>
