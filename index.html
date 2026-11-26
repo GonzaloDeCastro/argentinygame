@@ -30,6 +30,8 @@
   .bar i { display:block; height:100%; background:#4c4; }
   #overlay { position:fixed; inset:0; background:rgba(10,6,3,.88); display:flex; align-items:center; justify-content:center; z-index:10; padding:16px; }
   #overlay.hidden { display:none; }
+  .playbar { position:sticky; top:-24px; z-index:5; background:#2a1e15; padding:8px 0 2px; }
+  .playbar button { font-size:18px; font-weight:bold; }
   .box { max-height:92vh; overflow-y:auto; max-width:580px; background:#2a1e15; border:4px solid #e8c872; padding:24px 28px; text-align:center; }
   .box h1 { margin:0 0 4px; color:#e8c872; font-size:26px; }
   .box h3 { margin:0 0 14px; color:#b9a77a; font-weight:normal; font-style:italic; }
@@ -206,7 +208,7 @@ function reachable(u) {
       const nx = cur.x + dx, ny = cur.y + dy;
       if (!inMap(nx, ny)) continue;
       const cost = tile(nx, ny).cost && tile(nx, ny).cost[u.cls];
-      if (cost == null) continue;
+      if (cost == null || (B.blocked && B.blocked(u, nx, ny))) continue;
       const other = unitAt(nx, ny);
       if (other && other.team !== u.team) continue;
       const nc = cur.c + cost;
@@ -238,7 +240,7 @@ function findPath(u, tx, ty) {                                   // camino de me
       const nx = cur.x + dx, ny = cur.y + dy;
       if (!inMap(nx, ny)) continue;
       const cost = tile(nx, ny).cost && tile(nx, ny).cost[u.cls];
-      if (cost == null) continue;
+      if (cost == null || (B.blocked && B.blocked(u, nx, ny))) continue;
       const other = unitAt(nx, ny);
       if (other && other.team !== u.team) continue;
       const nc = cur.c + cost; if (nc > mv) continue;
@@ -374,13 +376,15 @@ function checkEnd() {
 function startPlayerTurn() {
   units.forEach(u => u.acted = false);
   state = "select"; selected = null; moveMap = null; targets = null; busy = false;
-  $turn.textContent = "Turno " + turn + " - " + B.pName;
+  if (B.survive && turn > B.survive) { showEnd(true); return; }
+  $turn.textContent = turnLabel(B.pName);
   $end.disabled = false;
   showBanner(B.pBanner, "rgba(36,84,168,.92)");
   log("-- Turno " + turn + ": " + B.pName + " --");
   runTurnEvent();
   autoSave();
 }
+const turnLabel = who => "Turno " + turn + (B.survive ? " de " + B.survive : "") + " - " + who;
 function finishUnit(u) {
   u.acted = true; selected = null; moveMap = null; targets = null; state = "select";
   if (checkEnd()) return;
@@ -390,9 +394,9 @@ async function endPlayerTurn() {
   if (busy || state === "over") return;
   busy = true; state = "enemy"; selected = null; moveMap = null; targets = null;
   $end.disabled = true;
-  $turn.textContent = "Turno " + turn + " - Realistas";
-  log("-- Turno " + turn + ": avanzan los Realistas --");
-  showBanner("FASE REALISTA", "rgba(168,40,28,.92)");
+  $turn.textContent = turnLabel(B.eName || "Realistas");
+  log("-- Turno " + turn + ": avanzan los " + (B.eName || "Realistas") + " --");
+  showBanner(B.eBanner || "FASE REALISTA", "rgba(168,40,28,.92)");
   await sleep(fastMode ? 0 : 1300);
   for (const u of alive().filter(x => x.team === "e")) {
     if (u.hp <= 0) continue;
@@ -520,13 +524,13 @@ function updateInfo() {
   let html = "";
   if (u) {
     const pct = Math.round(100 * u.hp / u.maxhp);
-    html += "<b>" + u.name + "</b>" + (u.leader ? " ★" : "") + "<br>" + CLASSES[u.cls].label + " · " + (u.team === "p" ? B.pName : "Realistas") +
+    html += "<b>" + u.name + "</b>" + (u.leader ? " ★" : "") + "<br>" + CLASSES[u.cls].label + " · " + (u.team === "p" ? B.pName : B.eName || "Realistas") +
       "<br>PV " + u.hp + "/" + u.maxhp + " <span class='bar'><i style='width:" + pct + "%'></i></span>" +
       "<br>Fue " + u.str + " · Hab " + u.skl + " · Vel " + u.spd +
       "<br>Def " + u.def + " · Sue " + u.lck + " · Mov " + movOf(u) +
       "<br>" + (u.weapons.length ? u.weapons.map((w, i) => (i === 0 ? "<b>" + w.name + "</b>" : w.name) + " " + w.uses).join(" · ") : "<i>sin armas</i>");
   } else html += "Selecciona una unidad.";
-  html += "<br><span style='color:#b9a77a'>Terreno: " + t.name + (t.def ? " (+" + t.def + " def" + (t.avoid ? ", +" + t.avoid + " esq" : "") + ")" : "") + (t.cost ? "" : " (intransitable)") + "</span>";
+  html += "<br><span style='color:#b9a77a'>Terreno: " + t.name + (t.def ? " (+" + t.def + " def" + (t.avoid ? ", +" + t.avoid + " esq" : "") + ")" : "") + (t.cost && t.name !== "Agua" ? "" : " (intransitable)") + "</span>";
   $info.innerHTML = html;
 }
 
@@ -902,9 +906,9 @@ function unitSprite(u, t, wt, dir) {                               // sprite de 
     u._sk = key; const x = u._sc.getContext("2d");
     x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, u._sc.width, u._sc.height);
     x.setTransform(RES, 0, 0, RES, SPOX * RES, SPOY * RES); x.save();
-    const s = u.cls === "cav" ? 0.235 : u.cls === "art" ? 0.26 : 0.275; x.scale(dir * s, s);
+    const s = u.cls === "cav" ? 0.235 : u.cls === "art" ? 0.26 : u.cls === "ship" ? 0.23 : 0.275; x.scale(dir * s, s);
     LWMUL = 2.2;
-    if (u.cls === "cav") bigCav(x, u, t, wt); else if (u.cls === "inf") bigInf(x, u, t, wt); else bigArt(x, u, t);
+    if (u.cls === "cav") bigCav(x, u, t, wt); else if (u.cls === "inf") bigInf(x, u, t, wt); else if (u.cls === "ship") bigShip(x, u, t); else bigArt(x, u, t);
     LWMUL = 1; x.restore();
     x.globalCompositeOperation = "source-atop";                                           // luz sobre el sprite (sol arriba a la izquierda)
     const lg = x.createLinearGradient(-22, -50, 18, 2);
@@ -1128,7 +1132,7 @@ function drawFace(c, f, team, x, y, size, mood) {
     P("M14,84 L30,79 L90,102 L66,102 Z", "rgba(0,0,0,.18)", null, 0, 0);
   }
   if (uni === "gen") for (const by of [90, 96]) { c.fillStyle = RG(50, by, 0.2, 2.4, [[0, "#fff0a8"], [1, "#a8802a"]]); c.beginPath(); c.arc(50, by, 2, 0, 7); c.fill(); }
-  else for (const by of [91, 97]) if (!(uni === "gran" || f.belts)) { c.fillStyle = RG(50, by, 0.2, 2.2, [[0, "#fff0a8"], [1, "#a8802a"]]); c.beginPath(); c.arc(50, by, 1.8, 0, 7); c.fill(); }
+  else for (const by of [91, 97]) if (!(uni === "gran" || uni === "civil" || f.belts)) { c.fillStyle = RG(50, by, 0.2, 2.2, [[0, "#fff0a8"], [1, "#a8802a"]]); c.beginPath(); c.arc(50, by, 1.8, 0, 7); c.fill(); }
   // ---- cuello ----
   P("M40,64 L60,64 L62,82 C56,87 44,87 38,82 Z", LG(0, 64, 0, 86, [[0, S.sh], [1, S.dp]]));
   P("M40,64 L60,64 L60,74 C54,78 46,78 40,74 Z", "rgba(0,0,0,.28)");
@@ -1557,7 +1561,7 @@ function bigArt(c, u, t) {
 function drawBigUnit(u, t, wt) {
   c_ = ctx; ctx.save();
   if (u.flash > 0 && u.flash % 4 < 2) ctx.globalAlpha *= 0.45;
-  if (u.cls === "cav") bigCav(ctx, u, t, wt); else if (u.cls === "inf") bigInf(ctx, u, t, wt); else bigArt(ctx, u, t);
+  if (u.cls === "cav") bigCav(ctx, u, t, wt); else if (u.cls === "inf") bigInf(ctx, u, t, wt); else if (u.cls === "ship") bigShip(ctx, u, t); else bigArt(ctx, u, t);
   ctx.restore();
 }
 function muzzlePos(u, wt) { return wt === "bola" ? [60, -150] : u.cls === "art" ? [80, -71] : u.cls === "cav" ? [98, -114] : [104, -104]; }
@@ -1739,6 +1743,7 @@ const HELP_HTML =
   "<li><b>Crítico:</b> triplica el daño. Las armas se gastan con cada golpe y se rompen al llegar a 0.</li></ul>" +
   "<h2>Armas y alcance</h2><p>Sable, machete y bayoneta: alcance 1 (cuerpo a cuerpo). Carabina y fusil: alcance 2 (no pegan de cerca). Cañón: alcance 2 a 3 (muy potente, no pega de cerca).</p>" +
   "<h2>Armas y terreno de Tucumán</h2><ul><li><b>Lanza</b>: alcance 1, vence al sable. <b>Facón</b>: espada corta y rápida. <b>Boleadoras</b>: alcance 2, poco daño, pero si aciertan el enemigo pierde 2 de movimiento en su turno.</li><li>El <b>sembrado</b> da +10 de esquive y cuesta más movimiento a la caballería. El agua es intransitable: solo se cruza por el vado.</li></ul>" +
+  "<h2>Buques y resistencia (Vuelta de Obligado)</h2><p>Los buques solo se mueven por el agua. Ganás si resistís los turnos indicados.</p>" +
   "<h2>Cerros y refuerzos (Chacabuco y Maipú)</h2><ul><li>El <b>cerro</b> da +2 de defensa y +15 de esquive, pero cuesta más moverse. Los realistas lo ocupan: busca los pasos y rodéalo.</li><li>Algunas batallas traen <b>refuerzos</b> en un turno fijo (te lo avisa el consejo inicial): aparecen en el mapa y pueden actuar ese mismo turno.</li></ul>" +
   "<h2>Otros controles</h2><ul>" +
   "<li><b>Espacio / Enter / clic:</b> avanzar los diálogos. <b>Saltar:</b> botón arriba a la derecha.</li>" +
@@ -1783,7 +1788,7 @@ const NAMED_CRY = { 1: "¡Por la libertad de América!", 2: "¡A la carga, grana
 function cryFor(u) {
   if (u.cls === "art" && Math.random() < 0.6) return "¡Fuego!";
   if (NAMED_CRY[u.id] && Math.random() < 0.7) return NAMED_CRY[u.id];
-  const l = CRIES[u.team]; return l[Math.floor(Math.random() * l.length)];
+  const l = (u.team === "e" && B.eCries) || CRIES[u.team]; return l[Math.floor(Math.random() * l.length)];
 }
 async function shoutsAt(a, d) {
   for (const [u, prob] of [[a, 1], [d, 0.65]]) {
@@ -1794,10 +1799,11 @@ async function shoutsAt(a, d) {
   }
 }
 function drawDatePlate(x, y) {                                    // la fecha de la batalla, siempre a la vista
-  ctx.font = "bold 13px Georgia"; const w = ctx.measureText(B.date).width + 34, h = 24;
+  const date = (dlg && dlg.date) || B.date;
+  ctx.font = "bold 13px Georgia"; const w = ctx.measureText(date).width + 34, h = 24;
   uiPanel(x, y, w, h, { top: "#3a2c1a", bot: "#1e150c" });
   ctx.fillStyle = "#e8c872"; ctx.textAlign = "center"; ctx.fillText("\u2605", x + 11, y + 16.4); ctx.fillText("\u2605", x + w - 11, y + 16.4);
-  ctx.fillStyle = "#000"; ctx.fillText(B.date, x + w / 2 + 1, y + 17); ctx.fillStyle = "#fff3c8"; ctx.fillText(B.date, x + w / 2, y + 16); ctx.textAlign = "left";
+  ctx.fillStyle = "#000"; ctx.fillText(date, x + w / 2 + 1, y + 17); ctx.fillStyle = "#fff3c8"; ctx.fillText(date, x + w / 2, y + 16); ctx.textAlign = "left";
 }
 function drawBubble(sh) {
   ctx.font = "italic bold 16px Georgia";
@@ -1953,6 +1959,10 @@ function drawBanner(now) {
 // ================= GRAFICOS v3: ESCENA DE COMBATE =================
 const SCENE_MARGIN = 30;
 const SCENE_STYLE = {
+  suipacha:   { sky: ["#6aa0da", "#f2e6c8"], sun: [500, 70], sunCol: "255,244,200", haze: "244,230,206", feat: "andes" },
+  ituzaingo:  { sky: ["#82b4e0", "#eef0da"], sun: [300, 70], sunCol: "255,246,214", haze: "238,236,214", feat: "plain" },
+  obligado:   { sky: ["#7cacd8", "#f0ecdc"], sun: [140, 76], sunCol: "255,244,206", haze: "232,236,226", feat: "river" },
+  salta:      { sky: ["#8fa8bc", "#e6e8de"], sun: [110, 80], sunCol: "240,240,220", haze: "226,232,222", feat: "ranchos" },
   sanlorenzo: { sky: ["#6a9ad4", "#f8e0b4"], sun: [520, 84], sunCol: "255,236,176", haze: "255,228,176", feat: "river" },
   tucuman:    { sky: ["#78b8e6", "#f7f0d6"], sun: [110, 74], sunCol: "255,244,200", haze: "255,242,206", feat: "ranchos" },
   chacabuco:  { sky: ["#5a88cc", "#e8f0f6"], sun: [520, 66], sunCol: "255,248,220", haze: "232,240,250", feat: "andes" },
@@ -2129,7 +2139,7 @@ function sceneUnitImage(idx, u, t, wt, mirror) {
   x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, c.width, c.height);
   x.setTransform(RES, 0, 0, RES, 240 * RES, 230 * RES); x.save(); if (mirror) x.scale(-1, 1);
   LWMUL = 1;
-  if (u.cls === "cav") bigCav(x, u, t, wt); else if (u.cls === "inf") bigInf(x, u, t, wt); else bigArt(x, u, t);
+  if (u.cls === "cav") bigCav(x, u, t, wt); else if (u.cls === "inf") bigInf(x, u, t, wt); else if (u.cls === "ship") bigShip(x, u, t); else bigArt(x, u, t);
   x.restore();
   x.globalCompositeOperation = "source-atop";
   const lg = x.createLinearGradient(-90, -210, 110, 6); lg.addColorStop(0, "rgba(255,244,200,.34)"); lg.addColorStop(0.42, "rgba(255,255,255,0)"); lg.addColorStop(1, "rgba(10,18,56,.38)");
@@ -2354,6 +2364,10 @@ function drawBackdrop(kind, t, rel, ph) {
   if (kind === "abrazo") { drawAbrazo(t, rel || 0, ph || 0); return; }
   if (kind === "convento") { drawNightConvent(t); return; }
   if (kind === "amanecer") { drawDawn(t); return; }
+  if (kind === "rio") { drawRio(t); return; }
+  if (kind === "cabildo") { drawCabildo(t); return; }
+  if (kind === "congreso") { drawCongreso(t); return; }
+  if (kind === "noche") { drawNoche(t); return; }
   drawDayField(t);
 }
 function drawDialogue(t) {
@@ -2858,6 +2872,7 @@ function drawCow(px, py, t) {
   ctx.restore();
 }
 function drawDecor(t) {
+  if (B.overlay) B.overlay(t);
   if (!B.decor) return;
   for (const d of B.decor) { if (d.k === "hay") drawHay(d.x * TS, d.y * TS); else if (d.k === "cow") drawCow(d.x * TS, d.y * TS, t); }
 }
@@ -2867,7 +2882,7 @@ TERRAIN.R = { name: "Cerro", cost: { cav: 3, inf: 2, art: 3 }, def: 2, avoid: 15
 
 // ================= REFUERZOS =================
 function unitForSpeaker(id) {                                    // un personaje puede hablar antes de aparecer en el mapa (refuerzos)
-  return units.find(x => x.id === id) || chaReinf().concat(maiReinf()).find(x => x.id === id) || units[0];
+  return units.find(x => x.id === id) || chaReinf().concat(maiReinf(), salReinf(), suiReinf(), ituReinf(), oblLanding(), ACTORS).find(x => x.id === id) || units[0];
 }
 function spawn(list) {
   const D = (B.diff && (B.diff[difficulty] || B.diff.normal)) || DIFF.normal;
@@ -3131,6 +3146,548 @@ Object.assign(BATTLES, {
   }
 });
 
+// ================= SALTA (20-02-1813) =================
+Object.assign(FACES, {
+  401: { skin: "fair", hair: "#3a2415", hairHi: "#5a3a24", eye: "#3a2a1a", style: "curly", hat: "shako", hatCol: "#1d3d6b", coat: "#2d5aa8", collar: "#b3261e", brow: 2.8, jaw: 1.04, nose: 1.05, side: true, belts: true, epa: true },
+  402: { skin: "tan",  hair: "#1e130c", hairHi: "#3a2416", eye: "#2e1c10", style: "cropped", hat: "shako", hatCol: "#1d3d6b", coat: "#2d5aa8", collar: "#b3261e", brow: 2.4, jaw: 1.0, nose: 1.15, stache: true, belts: true, epa: true }
+});
+Object.assign(SPK, { dor: { unit: 401, name: "Cnel. Manuel Dorrego" }, sar: { unit: 402, name: "Cap. Apolinario Saravia" } });
+Object.assign(NAMED_CRY, { 401: "¡Carguen sin miedo!", 402: "¡Por Salta y la Patria!" });
+const SAL_MAP = [
+  "T...T..S....T..R",
+  "..T.....S.....RR",
+  "....S......T....",
+  ".T....~~.....CC.",
+  "......~~.....CC.",
+  "..S.............",
+  "......~~....T...",
+  ".T....~~........",
+  "....S.....RR..R.",
+  "..T......RRRR.RR",
+  "T....T..RRRRRRRR"
+];
+function salUnits() {
+  const P = (id, n, cls, x, y, st, w, ex) => mk(id, n, "p", cls, x, y, st, w, ex), E = (id, n, cls, x, y, st, w, ex) => mk(id, n, "e", cls, x, y, st, w, ex);
+  const dr = [20, 6, 6, 8, 3, 3, 9], so = [22, 6, 5, 6, 4, 4, 9], ie = [21, 6, 4, 5, 3, 2, 8], er = [21, 6, 5, 8, 3, 3, 9];
+  return [
+    P(101, "Gral. Belgrano", "cav", 1, 5, [28, 8, 9, 8, 5, 6, 10], ["sable", "carabina"], { leader: true }),
+    Object.assign(P(102, "Cnel. Díaz Vélez", "cav", 3, 3, [26, 8, 7, 9, 4, 5, 10], ["lanza", "carabina"]), { hp: 18 }),
+    P(402, "Cap. Saravia", "cav", 3, 1, [22, 7, 8, 10, 4, 6, 9], ["lanza", "boleadoras"]),
+    P(104, "Gaucho salteño", "cav", 3, 8, [20, 6, 6, 9, 3, 5, 8], ["facon", "boleadoras"], { face: "gaucho" }),
+    P(403, "Dragón del Norte", "cav", 2, 7, dr, ["sable", "carabina"]),
+    P(404, "Infante del Norte", "inf", 4, 4, so, ["bayoneta", "fusil"]), P(405, "Infante del Norte", "inf", 4, 5, so, ["bayoneta", "fusil"]),
+    P(406, "Infante del Norte", "inf", 4, 6, so, ["bayoneta", "fusil"]), P(407, "Infante del Norte", "inf", 3, 5, so, ["bayoneta", "fusil"]),
+    P(408, "Cañón patriota", "art", 2, 4, [14, 5, 4, 3, 2, 2, 12], ["canon"]),
+    E(111, "Gral. Pío Tristán", "inf", 14, 5, [28, 7, 7, 6, 5, 5, 10], ["bayoneta", "fusil"], { leader: true }),
+    E(412, "Infante realista", "inf", 9, 2, ie, ["bayoneta", "fusil"]), E(413, "Infante realista", "inf", 9, 4, ie, ["machete", "fusil"]),
+    E(414, "Infante realista", "inf", 9, 5, ie, ["bayoneta", "fusil"]), E(415, "Infante realista", "inf", 9, 6, ie, ["machete", "fusil"]),
+    E(416, "Infante realista", "inf", 10, 3, ie, ["bayoneta", "fusil"]), E(417, "Infante realista", "inf", 10, 7, ie, ["bayoneta", "fusil"]),
+    E(418, "Infante realista", "inf", 12, 5, ie, ["bayoneta", "fusil"]), E(419, "Infante realista", "inf", 11, 4, ie, ["bayoneta", "fusil"]),
+    E(420, "Dragón realista", "cav", 11, 1, er, ["sable", "carabina"]), E(421, "Dragón realista", "cav", 11, 8, er, ["sable", "carabina"]),
+    E(422, "Cañón realista", "art", 12, 3, [14, 5, 3, 3, 1, 1, 12], ["canon"]), E(423, "Cañón realista", "art", 12, 7, [14, 5, 3, 3, 1, 1, 12], ["canon"])
+  ];
+}
+function salReinf() {
+  return [
+    mk(401, "Cnel. Dorrego", "p", "cav", 0, 5, [25, 8, 8, 9, 4, 5, 10], ["sable", "carabina"]),
+    mk(409, "Dragón de reserva", "p", "cav", 0, 4, [20, 6, 6, 8, 3, 3, 9], ["sable", "carabina"]),
+    mk(410, "Infante de reserva", "p", "inf", 0, 6, [22, 6, 5, 6, 4, 4, 9], ["bayoneta", "fusil"])
+  ];
+}
+const INTRO_S = [
+  { bg: "campo", cap: "Febrero de 1813. Después de la victoria de Tucumán, el Ejército del Norte avanza sobre Salta, donde Pío Tristán se ha hecho fuerte." },
+  { who: "dvz", side: "L", mood: "serious", text: "General, Tristán espera que lleguemos por el camino principal, desde el sur." },
+  { who: "sar", side: "R", mood: "smile",   text: "Yo conozco la quebrada de Chachapoyas, mi general. Por ahí podemos aparecer por el norte sin que nos esperen." },
+  { who: "bel", side: "L", mood: "serious", text: "Entonces iremos por la quebrada, capitán. La lluvia y el barro no nos van a detener." },
+  { cap: "20 de febrero de 1813, Campo de Castañares. Por primera vez, el Ejército del Norte entra en batalla con la bandera celeste y blanca." },
+  { who: "pio", side: "R", mood: "sad",     text: "¿Por el norte? ¡No puede ser! ¡Cambien el frente, rápido!" },
+  { who: "bel", side: "L", mood: "angry",   text: "¡Soldados, miren su bandera! ¡Adelante por la Patria!" }
+];
+const EPILOGUE_S = [
+  { bg: "campo", cap: "Arrinconado contra la ciudad, el ejército realista pide capitulación. Pío Tristán entrega las armas." },
+  { who: "dvz", side: "L", mood: "smile",   text: "Se rinden, mi general. Todo el ejército: armas, cañones y banderas." },
+  { who: "bel", side: "R", mood: "serious", text: "Trátenlos con humanidad. Podrán volver a sus casas si juran no tomar otra vez las armas contra nosotros." },
+  { who: "sar", side: "L", mood: "serious", text: "¿Y los caídos, mi general?" },
+  { who: "bel", side: "R", mood: "sad",     text: "Los de ambos bandos descansarán juntos, bajo una misma cruz." },
+  { cap: "En ese lugar se colocó una cruz en memoria de los vencedores y vencidos en Salta, el 20 de febrero de 1813." }
+];
+function salLinesReinf() {
+  return [
+    { bg: "campo", cap: "Belgrano ordena entrar a la reserva, con Dorrego al frente." },
+    { who: "dor", side: "L", mood: "angry", text: "¡Reserva, a la carga! ¡No les demos tiempo de rehacerse!" },
+    { who: "bel", side: "R", mood: "smile", text: "Ahora, Dorrego. ¡Empujémoslos hasta la ciudad!" }
+  ];
+}
+function salMid() {
+  const ally = [401, 102, 402].map(id => units.find(u => u.id === id)).find(u => u && u.hp > 0), pio = units.find(u => u.id === 111);
+  const who = { 401: "dor", 102: "dvz", 402: "sar" };
+  const lines = [
+    { bg: "campo", cap: "La batalla se inclina: los realistas retroceden hacia la ciudad." },
+    { who: "bel", side: "L", mood: "angry", text: "¡Ya ceden! ¡Un esfuerzo más, soldados de la Patria!" }
+  ];
+  if (ally) lines.push({ who: who[ally.id], side: "R", mood: "smile", text: "¡Viva la Patria, mi general!" });
+  if (pio && pio.hp > 0) lines.push({ who: "pio", side: "R", mood: "angry", text: "¡Sostengan la línea! ¡Viva el Rey!" });
+  return lines;
+}
+Object.assign(BATTLES, {
+  salta: {
+    id: "salta", order: 3, title: "SALTA", date: "20 de febrero de 1813",
+    blurb: "Belgrano sorprende a Tristán por el norte y lleva la bandera celeste y blanca a la batalla.",
+    map: SAL_MAP, leaderId: 101, leaderFall: "Belgrano ha caído.", pName: "Ejército del Norte", pBanner: "FASE DEL EJÉRCITO DEL NORTE",
+    units: salUnits, decor: [], building: "rancho",
+    diff: { easy: { drop: [417, 419, 423, 421], hpM: 0.8, strD: -1, pHp: 6 }, normal: { drop: [417, 419], hpM: 0.9, strD: 0, pHp: 3 }, hard: { drop: [], hpM: 1, strD: 0, pHp: 2 } },
+    startLog: "El Ejército del Norte aparece por donde nadie lo esperaba.",
+    introHTML:
+      "<h1>SALTA</h1><h3>20 de febrero de 1813</h3>" +
+      "<p>Tras vencer en Tucumán, Belgrano avanza sobre Salta. Con la guía del salteño Apolinario Saravia, rodea a los realistas por la quebrada de Chachapoyas y ataca desde el norte a Pío Tristán en el Campo de Castañares.</p>" +
+      "<p><b>Objetivo:</b> derrota a todos los realistas.<br><b>Derrota:</b> si cae Belgrano (★) o todo tu ejército.</p>" +
+      "<p class='help'><b>Consejos:</b> los zanjones con agua no se cruzan: hay pasos al norte, al centro y al sur. Díaz Vélez empieza <b>herido</b>. En el <b>tercer turno</b> entra la <b>reserva</b> de Dorrego.</p>",
+    intro: INTRO_S, epilogue: EPILOGUE_S, midLines: salMid,
+    duel: { a: 101, b: 111, lines: [
+      { bg: "campo", cap: "Belgrano y Tristán vuelven a encontrarse." },
+      { who: "bel", side: "L", mood: "serious", text: "Otra vez frente a frente, Tristán. Rinda las armas y evite más sangre." },
+      { who: "pio", side: "R", mood: "angry",   text: "¡Todavía no! ¡Viva el Rey!" },
+      { who: "bel", side: "L", mood: "angry",   text: "Entonces que sea hasta el final. ¡Por la Patria!" }
+    ] },
+    turnEvents: { 3: { apply() { spawn(salReinf()); log("¡Entra la reserva con Dorrego!", "#ffd84a"); }, lines: salLinesReinf } },
+    victoryHTML() {
+      return "<h1>¡VICTORIA!</h1><h3>Tristán capitula en Salta</h3>" +
+        "<p>El 20 de febrero de 1813, en el Campo de Castañares, Belgrano derrotó a Pío Tristán, que capituló con su ejército. Fue la primera batalla librada con la bandera celeste y blanca.</p>" +
+        "<p>Belgrano dejó libres a los vencidos bajo juramento de no volver a combatir contra la Revolución, y los caídos de ambos bandos fueron enterrados juntos.</p>";
+    },
+    defeatHTML: "<p>La historia fue distinta: el Ejército del Norte venció. Avanza junto, usa el cañón antes de cruzar los pasos y guarda a Díaz Vélez, que empieza herido, hasta que llegue la reserva.</p>"
+  }
+});
+BATTLES.chacabuco.order = 4; BATTLES.maipu.order = 5;
+
+// ================= SUIPACHA, ITUZAINGÓ Y VUELTA DE OBLIGADO =================
+const civil = (o) => Object.assign({ uni: "civil", skin: "fair", hair: "#3a2616", hairHi: "#5a3d24", eye: "#3a2a1a", style: "short", hat: "none", coat: "#23232b", collar: "#efe9d8", brow: 2.4, jaw: 1.0, nose: 1.1, belts: false, epa: false }, o || {});
+const militar = (o) => civil(Object.assign({ uni: "gen", coat: "#274f95", collar: "#b3261e", epa: true, side: 2 }, o || {}));
+Object.assign(FACES, {
+  // historia
+  801: militar({ hair: "#8a8a8e", hairHi: "#b8b8bc", skin: "old", side: 1 }),                // Saavedra
+  802: civil({ hair: "#1c120c", side: 2, jaw: 0.96 }),                                       // Moreno
+  803: civil({ hair: "#2a1a10", style: "swept", side: 1, nose: 1.25 }),                      // Castelli
+  804: civil({ skin: "old", hair: "#9a9a9e", hairHi: "#c8c8cc", coat: "#7a1f1a", epa: true, collar: "#d2ac48" }), // Cisneros
+  805: civil({ hair: "#4a3220", style: "curly", side: 2 }),                                  // Laprida
+  806: civil({ skin: "tan", hair: "#241810", style: "cropped", coat: "#4a3a2c" }),           // Fray de Oro
+  // Suipacha
+  501: militar({ hair: "#4a3220", hat: "bicorne" }),                                         // Balcarce
+  511: militar({ skin: "old", hair: "#6a6a6e", coat: "#a5281d", collar: "#262626", hat: "tricorn" }), // Córdoba
+  // Ituzaingó
+  601: militar({ hair: "#2a1a10", style: "swept", hat: "bicorne", side: 3 }),                // Alvear
+  602: militar({ hair: "#8a6238", hairHi: "#b08a58", eye: "#46708e", hat: "shako", hatCol: "#1d3d6b", stache: true, mustache: "thick" }), // Lavalle
+  603: militar({ skin: "tan", hair: "#2a1a10", hat: "shako", hatCol: "#1d3d6b" }),           // Paz
+  604: militar({ hair: "#5a4028", hat: "shako", hatCol: "#1d3d6b", stache: true, mustache: "pointed" }), // Brandsen
+  611: militar({ skin: "old", hair: "#b8b8bc", coat: "#2c6a46", collar: "#d2ac48", hat: "bicorne" }),    // Barbacena
+  // Obligado
+  701: militar({ skin: "tan", hair: "#1c120c", hat: "bicorne", stache: true, mustache: "thick", coat: "#1d2f5c" }), // Mansilla
+  702: militar({ hair: "#6a4424", hat: "cap", stache: true }),                               // Thorne
+  703: militar({ skin: "tan", hair: "#241810", hat: "cap" }),                                // Alzogaray
+  711: militar({ skin: "fair", hair: "#7a5a38", coat: "#1c2440", collar: "#d2ac48", hat: "bicorne" })    // capitán de la escuadra
+});
+Object.assign(SPK, {
+  saa: { unit: 801, name: "Cornelio Saavedra" }, mor: { unit: 802, name: "Mariano Moreno" }, cas: { unit: 803, name: "Juan José Castelli" },
+  cis: { unit: 804, name: "Virrey Cisneros" }, lap: { unit: 805, name: "Francisco N. de Laprida" }, oro: { unit: 806, name: "Fray Justo S. M. de Oro" },
+  gba: { unit: 501, name: "Gral. González Balcarce" }, cor: { unit: 511, name: "José de Córdoba" },
+  alv: { unit: 601, name: "Gral. Carlos de Alvear" }, lav: { unit: 602, name: "Cnel. Juan Lavalle" }, paz: { unit: 603, name: "Cnel. José M. Paz" },
+  bra: { unit: 604, name: "Cnel. Federico Brandsen" }, bar: { unit: 611, name: "Marqués de Barbacena" },
+  man: { unit: 701, name: "Gral. Lucio N. Mansilla" }, tho: { unit: 702, name: "Juan B. Thorne" }, alz: { unit: 703, name: "Álvaro Alzogaray" },
+  cap: { unit: 711, name: "Capitán de la escuadra" }
+});
+Object.assign(NAMED_CRY, { 501: "¡Por la Junta y la Patria!", 601: "¡Adelante la República!", 602: "¡A la carga, lanceros!", 701: "¡Viva la Soberanía!", 702: "¡Fuego sin descanso!", 511: "¡Viva el Rey!", 611: "¡Por el Imperio!" });
+const ACTORS = [[801, "p"], [802, "p"], [803, "p"], [804, "e"], [805, "p"], [806, "p"], [101, "p"], [1, "p"], [202, "p"], [205, "p"]].map(([id, team]) => ({ id, team, cls: "inf", name: "", hp: 1, weapons: [] }));
+
+TERRAIN.R = TERRAIN.R || { name: "Cerro", cost: { cav: 3, inf: 2, art: 3 }, def: 2, avoid: 15 };
+CLASSES.ship = { label: "Buque de guerra", mov: 2 };
+TERRAIN["~"] = { name: "Agua", cost: { ship: 1 }, def: 0, avoid: 0 };       // solo los buques navegan
+WEAPONS.andanada = { name: "Andanada", type: "cannon", mt: 7, hit: 65, crit: 0, wt: 10, rmin: 2, rmax: 3, uses: 30 };
+WEAPONS.bateria = { name: "Batería", type: "cannon", mt: 11, hit: 80, crit: 5, wt: 10, rmin: 2, rmax: 3, uses: 20 };
+
+const mkP = (id, n, cls, x, y, st, w, ex) => mk(id, n, "p", cls, x, y, st, w, ex);
+const mkE = (id, n, cls, x, y, st, w, ex) => mk(id, n, "e", cls, x, y, st, w, ex);
+
+// ----- Suipacha (7 de noviembre de 1810) -----
+const SUI_MAP = [
+  "RRRR....~...RRRR",
+  "RRR.....~....RRR",
+  "RR..T...~.....RR",
+  "....T.........R.",
+  "..S.....~.......",
+  "..S.....~..T....",
+  "..S.....~.......",
+  "....T.........R.",
+  "RR..T...~.....RR",
+  "RRR.....~....RRR",
+  "RRRR....~...RRRR"
+];
+function suiUnits() {
+  const so = [22, 6, 5, 6, 4, 4, 9], ie = [21, 6, 4, 5, 3, 2, 8];
+  return [
+    mkP(501, "Gral. Balcarce", "cav", 3, 5, [28, 8, 8, 8, 5, 6, 10], ["sable", "carabina"], { leader: true }),
+    mkP(502, "Soldado de la Junta", "inf", 4, 4, so, ["bayoneta", "fusil"]), mkP(503, "Soldado de la Junta", "inf", 4, 6, so, ["bayoneta", "fusil"]),
+    mkP(504, "Dragón de la Junta", "cav", 2, 4, [21, 6, 6, 8, 3, 3, 9], ["sable", "carabina"]),
+    mkP(505, "Gaucho", "cav", 2, 6, [20, 6, 6, 9, 3, 5, 8], ["lanza", "boleadoras"], { face: "gaucho" }),
+    mkP(506, "Cañón de la Junta", "art", 3, 3, [14, 5, 4, 3, 2, 2, 12], ["canon"]),
+    mkE(511, "José de Córdoba", "inf", 13, 5, [28, 7, 7, 6, 5, 5, 10], ["bayoneta", "fusil"], { leader: true }),
+    mkE(512, "Infante realista", "inf", 10, 3, ie, ["bayoneta", "fusil"]), mkE(513, "Infante realista", "inf", 10, 5, ie, ["machete", "fusil"]),
+    mkE(514, "Infante realista", "inf", 10, 7, ie, ["bayoneta", "fusil"]), mkE(515, "Infante realista", "inf", 11, 4, ie, ["bayoneta", "fusil"]),
+    mkE(516, "Infante realista", "inf", 11, 6, ie, ["machete", "fusil"]), mkE(517, "Infante realista", "inf", 12, 5, ie, ["bayoneta", "fusil"]),
+    mkE(518, "Cañón realista", "art", 12, 3, [14, 5, 3, 3, 1, 1, 12], ["canon"]), mkE(519, "Cañón realista", "art", 12, 7, [14, 5, 3, 3, 1, 1, 12], ["canon"])
+  ];
+}
+function suiReinf() {
+  return [
+    mkP(521, "Gaucho emboscado", "cav", 5, 1, [21, 7, 6, 9, 3, 5, 8], ["lanza", "boleadoras"], { face: "gaucho" }),
+    mkP(522, "Gaucho emboscado", "cav", 5, 9, [21, 7, 6, 9, 3, 5, 8], ["facon", "boleadoras"], { face: "gaucho" }),
+    mkP(523, "Infante emboscado", "inf", 6, 2, [22, 6, 5, 6, 4, 4, 9], ["bayoneta", "fusil"]),
+    mkP(524, "Infante emboscado", "inf", 6, 8, [22, 6, 5, 6, 4, 4, 9], ["bayoneta", "fusil"])
+  ];
+}
+const INTRO_SU = [
+  { bg: "campo", cap: "Octubre de 1810. La primera expedición de la Junta de Buenos Aires llega al Alto Perú. En Cotagaita los patriotas son rechazados." },
+  { who: "cas", side: "L", mood: "serious", text: "General, la Revolución necesita una victoria. Sin ella, el Alto Perú no nos seguirá." },
+  { who: "gba", side: "R", mood: "serious", text: "Córdoba cree que estamos sin ánimo ni municiones. Que lo siga creyendo, doctor." },
+  { who: "gba", side: "R", mood: "smile",   text: "Esconderemos parte de la tropa entre los cerros. Cuando avance, caerán sobre él." },
+  { cap: "7 de noviembre de 1810, a orillas del río Suipacha, en la actual Bolivia." },
+  { who: "cor", side: "R", mood: "smile",   text: "¡Son un puñado y están asustados! ¡Adelante, y acabemos con la rebelión!" },
+  { who: "gba", side: "L", mood: "angry",   text: "¡Firmes! ¡Que crucen el río!" }
+];
+const EPILOGUE_SU = [
+  { bg: "campo", cap: "Sorprendidos, los realistas huyen y abandonan sus armas. Es la primera gran victoria de las armas de la Revolución." },
+  { who: "cas", side: "L", mood: "smile",   text: "¡La noticia recorrerá toda América, general!" },
+  { who: "gba", side: "R", mood: "serious", text: "Es el primer paso. Queda un largo camino." },
+  { cap: "Tras Suipacha, varias ciudades del Alto Perú se sumaron a la Revolución." }
+];
+function suiLinesReinf() {
+  return [
+    { bg: "campo", cap: "De pronto, las tropas ocultas salen de entre los cerros y caen sobre los flancos." },
+    { who: "gba", side: "L", mood: "angry", text: "¡Ahora! ¡Todos al ataque!" },
+    { who: "cor", side: "R", mood: "sad",   text: "¡Es una trampa! ¿De dónde salieron?" }
+  ];
+}
+const genericMid = (bg, who, text, foe, foeText) => () => {
+  const lines = [{ bg, cap: "La batalla se inclina: el enemigo empieza a flaquear." }, { who, side: "L", mood: "angry", text }];
+  const f = units.find(u => u.id === SPK[foe].unit);
+  if (f && f.hp > 0) lines.push({ who: foe, side: "R", mood: "angry", text: foeText });
+  return lines;
+};
+
+// ----- Ituzaingó (20 de febrero de 1827) -----
+const ITU_MAP = [
+  "..T.....R.......",
+  "..........RR..T.",
+  "....S.....RR....",
+  "........~....T..",
+  "..T.....~.......",
+  "..............R.",
+  "..T.....~.......",
+  "........~....T..",
+  "....S.....RR....",
+  "..........RR..T.",
+  "..T.....R......."
+];
+function ituUnits() {
+  const ln = [22, 7, 6, 8, 3, 4, 9], so = [22, 6, 5, 6, 4, 4, 9], ie = [22, 6, 4, 5, 4, 2, 8], ec = [22, 6, 5, 7, 3, 3, 9];
+  return [
+    mkP(601, "Gral. Alvear", "cav", 1, 5, [27, 8, 8, 8, 5, 6, 10], ["sable", "carabina"], { leader: true }),
+    mkP(602, "Cnel. Lavalle", "cav", 4, 2, [26, 8, 8, 10, 4, 6, 10], ["lanza", "carabina"]),
+    mkP(604, "Cnel. Brandsen", "cav", 4, 5, [25, 8, 8, 9, 4, 4, 10], ["sable", "carabina"]),
+    mkP(603, "Cnel. Paz", "cav", 4, 8, [25, 7, 9, 9, 5, 6, 10], ["sable", "carabina"]),
+    mkP(605, "Lancero", "cav", 3, 1, ln, ["lanza", "carabina"]), mkP(606, "Lancero", "cav", 3, 9, ln, ["lanza", "carabina"]),
+    mkP(607, "Infante republicano", "inf", 3, 4, so, ["bayoneta", "fusil"]), mkP(608, "Infante republicano", "inf", 3, 6, so, ["bayoneta", "fusil"]),
+    mkE(611, "Barbacena", "inf", 14, 5, [29, 7, 7, 6, 5, 5, 10], ["bayoneta", "fusil"], { leader: true }),
+    mkE(612, "Infante imperial", "inf", 10, 3, ie, ["bayoneta", "fusil"]), mkE(613, "Infante imperial", "inf", 10, 4, ie, ["bayoneta", "fusil"]),
+    mkE(614, "Infante imperial", "inf", 10, 5, ie, ["machete", "fusil"]), mkE(615, "Infante imperial", "inf", 10, 6, ie, ["bayoneta", "fusil"]),
+    mkE(616, "Infante imperial", "inf", 10, 7, ie, ["bayoneta", "fusil"]), mkE(617, "Infante imperial", "inf", 12, 5, ie, ["machete", "fusil"]),
+    mkE(618, "Jinete imperial", "cav", 11, 1, ec, ["sable", "carabina"]), mkE(619, "Jinete imperial", "cav", 11, 9, ec, ["sable", "carabina"]),
+    mkE(620, "Jinete imperial", "cav", 12, 2, ec, ["sable", "carabina"]), mkE(621, "Jinete imperial", "cav", 12, 8, ec, ["sable", "carabina"]),
+    mkE(622, "Cañón imperial", "art", 12, 4, [15, 5, 3, 3, 2, 1, 12], ["canon"]), mkE(623, "Cañón imperial", "art", 12, 6, [15, 5, 3, 3, 2, 1, 12], ["canon"])
+  ];
+}
+function ituReinf() {
+  return [
+    mkP(609, "Artillería de Iriarte", "art", 0, 4, [16, 7, 6, 3, 3, 3, 12], ["canon"]),
+    mkP(610, "Artillería de Iriarte", "art", 0, 6, [16, 7, 6, 3, 3, 3, 12], ["canon"])
+  ];
+}
+const INTRO_IT = [
+  { bg: "campo", cap: "1827. La República Argentina y el Imperio del Brasil están en guerra por la Banda Oriental. El ejército de Alvear avanza en territorio enemigo." },
+  { who: "alv", side: "L", mood: "serious", text: "Barbacena cree que solo persigue nuestra retaguardia. Daremos la vuelta y lo enfrentaremos aquí." },
+  { who: "lav", side: "R", mood: "smile",   text: "Mis jinetes están listos para cargar, general." },
+  { who: "bra", side: "R", mood: "serious", text: "Cuidado con la zanja que protege a su infantería. De frente será muy costoso." },
+  { who: "paz", side: "R", mood: "serious", text: "Que cada cuerpo golpee donde el enemigo sea más débil." },
+  { cap: "20 de febrero de 1827, campos de Ituzaingó, en el actual Brasil." },
+  { who: "bar", side: "R", mood: "angry",   text: "¡Infantería, en línea! ¡Por el Emperador!" },
+  { who: "alv", side: "L", mood: "angry",   text: "¡Soldados de la República! ¡Adelante!" }
+];
+const EPILOGUE_IT = [
+  { bg: "campo", cap: "Tras unas seis horas de combate, el ejército imperial se retira del campo." },
+  { who: "paz", side: "R", mood: "serious", text: "Vencimos, general, y fue obra de todos. Muchos no volverán." },
+  { who: "alv", side: "L", mood: "serious", text: "Honor a los caídos, y entre ellos al coronel Brandsen, que cayó al frente de su carga." },
+  { cap: "En la batalla histórica Brandsen murió cargando contra la infantería parapetada tras la zanja. La guerra terminó en 1828 con la independencia del Uruguay." }
+];
+function ituLinesReinf() {
+  return [
+    { bg: "campo", cap: "Llega la artillería del coronel Iriarte y toma posición." },
+    { who: "alv", side: "L", mood: "smile", text: "¡Al fin los cañones! ¡Abran brecha en su línea!" }
+  ];
+}
+
+// ----- Vuelta de Obligado (20 de noviembre de 1845) -----
+const OBL_MAP = [
+  "~~~~~~~~~~~~~~~~",
+  "~~~~~~~~~~~~~~~~",
+  "~~~~~~~~~~~~~~~~",
+  "~~~~~~~~~~~~~~~~",
+  "................",
+  "..T..R....T.....",
+  ".....RR......T..",
+  "..S.......T.....",
+  "..S...T.......T.",
+  ".CC.......S.....",
+  "...T......S..T.."
+];
+const CHAIN_X = 5, SURVIVE = 8;
+function oblUnits() {
+  const bat = [24, 7, 7, 3, 5, 3, 13], so = [22, 6, 5, 6, 4, 4, 9], sh = [30, 6, 5, 2, 4, 2, 15];
+  return [
+    mkP(701, "Gral. Mansilla", "cav", 3, 7, [28, 8, 8, 8, 6, 6, 10], ["sable", "carabina"], { leader: true }),
+    mkP(702, "Batería de Thorne", "art", 7, 4, [26, 7, 8, 3, 5, 5, 13], ["bateria"]),
+    mkP(703, "Batería de Alzogaray", "art", 4, 4, [26, 7, 8, 3, 5, 4, 13], ["bateria"]),
+    mkP(704, "Batería", "art", 5, 4, bat, ["bateria"]), mkP(705, "Batería", "art", 9, 4, bat, ["bateria"]),
+    mkP(706, "Patricio", "inf", 8, 5, so, ["bayoneta", "fusil"]), mkP(707, "Patricio", "inf", 9, 6, so, ["bayoneta", "fusil"]),
+    mkP(708, "Patricio", "inf", 7, 7, so, ["bayoneta", "fusil"]),
+    mkP(709, "Gaucho", "cav", 4, 8, [21, 6, 6, 9, 3, 5, 8], ["lanza", "boleadoras"], { face: "gaucho" }),
+    mkP(710, "Gaucho", "cav", 6, 9, [21, 6, 6, 9, 3, 5, 8], ["facon", "boleadoras"], { face: "gaucho" }),
+    mkE(711, "Buque insignia", "ship", 14, 2, [38, 7, 6, 2, 5, 3, 16], ["andanada"], { leader: true }),
+    mkE(712, "Buque de guerra", "ship", 11, 1, sh, ["andanada"]), mkE(713, "Buque de guerra", "ship", 11, 3, sh, ["andanada"]),
+    mkE(714, "Buque de guerra", "ship", 13, 0, sh, ["andanada"]), mkE(715, "Buque de guerra", "ship", 13, 3, sh, ["andanada"]),
+    mkE(716, "Buque de guerra", "ship", 15, 1, sh, ["andanada"])
+  ];
+}
+function oblLanding() {
+  const mi = [21, 6, 5, 6, 3, 3, 9];
+  const list = [
+    mkE(721, "Infante de desembarco", "inf", 14, 4, mi, ["bayoneta", "fusil"]), mkE(722, "Infante de desembarco", "inf", 15, 5, mi, ["machete", "fusil"]),
+    mkE(723, "Infante de desembarco", "inf", 13, 4, mi, ["bayoneta", "fusil"]), mkE(724, "Infante de desembarco", "inf", 15, 4, mi, ["bayoneta", "fusil"]),
+    mkE(725, "Infante de desembarco", "inf", 14, 5, mi, ["machete", "fusil"])
+  ];
+  return list.slice(0, { easy: 2, normal: 3, hard: 5 }[difficulty] || 3);
+}
+const INTRO_OB = [
+  { bg: "rio", cap: "1845. Una poderosa escuadra de Inglaterra y Francia quiere remontar el Paraná sin permiso de la Confederación Argentina." },
+  { who: "man", side: "L", mood: "serious", text: "No tenemos sus barcos ni sus cañones. Pero el río aquí es angosto: lo cerraremos con cadenas." },
+  { who: "tho", side: "R", mood: "smile",   text: "Mis piezas están emplazadas en la barranca, general. Pasarán bajo nuestro fuego." },
+  { who: "alz", side: "R", mood: "serious", text: "Las cadenas descansan sobre las barcazas, de costa a costa." },
+  { cap: "20 de noviembre de 1845, paraje de la Vuelta de Obligado." },
+  { who: "cap", side: "R", mood: "angry",   text: "Corten esas cadenas y silencien las baterías. ¡Pasaremos!" },
+  { who: "man", side: "L", mood: "angry",   text: "¡Soldados! ¡Van a pasar por nuestro río sin permiso! ¡Viva la soberanía!" }
+];
+const EPILOGUE_OB = [
+  { bg: "rio", cap: "Al caer la tarde, sin municiones, los defensores se repliegan. La escuadra logra pasar, pero paga caro su avance." },
+  { who: "man", side: "L", mood: "serious", text: "No pudimos cerrarles el paso para siempre. Pero ya saben que este río tiene dueño." },
+  { who: "tho", side: "R", mood: "smile",   text: "Resistimos hasta el último cartucho, general." },
+  { cap: "Fue una derrota militar y un triunfo político: en los tratados posteriores, Inglaterra y Francia reconocieron la soberanía argentina sobre sus ríos." },
+  { cap: "Por eso cada 20 de noviembre se celebra el Día de la Soberanía Nacional." }
+];
+function oblLinesLanding() {
+  return [
+    { bg: "rio", cap: "A fuerza de golpes, los atacantes cortan las cadenas. Al mismo tiempo, bajan tropas a tierra." },
+    { who: "cap", side: "R", mood: "smile", text: "¡El paso está abierto! ¡Desembarco!" },
+    { who: "man", side: "L", mood: "angry", text: "¡Infantería, a la bayoneta! ¡Defiendan las baterías!" }
+  ];
+}
+const chainCut = () => !!evFlags.t4;
+function oblOverlay(t) {                                           // barcazas y cadenas cruzando el rio
+  const x = CHAIN_X * TS + TS / 2, cut = chainCut();
+  ctx.save();
+  ctx.strokeStyle = "#2a2a30"; ctx.lineWidth = 3; ctx.setLineDash([5, 3]);
+  for (let c = -8; c <= 8; c += 8) {
+    ctx.beginPath(); ctx.moveTo(x + c, 0);
+    if (cut) { ctx.lineTo(x + c - 4, 52); ctx.moveTo(x + c + 14, 112); ctx.lineTo(x + c, 4 * TS); } else ctx.lineTo(x + c, 4 * TS);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  for (let i = 0; i < 4; i++) {
+    if (cut && (i === 1 || i === 2)) continue;
+    const y = i * TS + TS / 2 + Math.sin(t / 500 + i) * 1.2;
+    ctx.fillStyle = "#5a3a20"; ctx.strokeStyle = INK; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(x - 15, y - 5); ctx.lineTo(x + 15, y - 5); ctx.lineTo(x + 10, y + 7); ctx.lineTo(x - 10, y + 7); ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+  ctx.restore();
+}
+function bigShip(c, u, t) {                                        // buque de guerra (proa hacia la derecha)
+  c.translate(0, Math.sin(t / 420 + u.id) * 2);
+  c.fillStyle = "#3d7cae"; c.beginPath(); c.ellipse(6, 2, 128, 20, 0, 0, 7); c.fill(); c.strokeStyle = "rgba(255,255,255,.55)"; c.lineWidth = 2.5; for (const [wx, wy] of [[-92, 6], [-40, 14], [30, 12], [84, 4]]) { c.beginPath(); c.moveTo(wx, wy); c.quadraticCurveTo(wx + 12, wy - 5, wx + 26, wy); c.stroke(); }
+  c.fillStyle = "rgba(255,255,255,.35)"; c.beginPath(); c.ellipse(0, 0, 82, 7, 0, 0, 7); c.fill();
+  PP(c, "M-70,-44 L62,-44 L86,-52 L66,-6 C30,4 -36,4 -60,-6 Z", "#3a2418", INK, 2);
+  PP(c, "M-66,-34 L70,-34 L67,-26 L-63,-26 Z", "#e8d9a8", INK, 1);
+  for (let x = -50; x <= 48; x += 19) PP(c, `M${x},-33 L${x + 8},-33 L${x + 8},-27 L${x},-27 Z`, "#14100c", null);
+  for (const [mx, h] of [[-38, 108], [4, 134], [44, 100]]) {
+    PP(c, `M${mx},-44 L${mx},${-44 - h}`, null, "#4a2e18", 4);
+    for (const k of [0.18, 0.58]) { const y = -44 - h * (1 - k), w = 20 + k * 12; PP(c, `M${mx - w},${y} C${mx - w + 10},${y + 8} ${mx + w - 10},${y + 8} ${mx + w},${y} L${mx + w - 3},${y + h * 0.3} C${mx + 8},${y + h * 0.36} ${mx - 8},${y + h * 0.36} ${mx - w + 3},${y + h * 0.3} Z`, "#f4ecd6", INK, 1.4); }
+  }
+  PP(c, "M4,-178 L34,-172 L4,-164 Z", u.id === 711 ? "#274f95" : "#b3261e", INK, 1.2);
+  PP(c, "M84,-52 L112,-66", null, "#4a2e18", 3);
+}
+function drawRio(t) {                                              // fondo de dialogo: el Parana con las cadenas y la escuadra
+  drawDayField(t);
+  const g = ctx.createLinearGradient(0, 214, 0, 306); g.addColorStop(0, "#8cc0de"); g.addColorStop(1, "#2f6496"); ctx.fillStyle = g; ctx.fillRect(0, 214, 640, 92);
+  for (const [x, y, s] of [[300, 238, 0.34], [400, 246, 0.42], [350, 226, 0.26]]) { ctx.save(); ctx.translate(x, y); ctx.scale(-s, s); LWMUL = 1; bigShip(ctx, { id: x }, t); ctx.restore(); }
+  ctx.strokeStyle = "#26262c"; ctx.lineWidth = 3; ctx.setLineDash([6, 3]); ctx.beginPath(); ctx.moveTo(0, 268); ctx.quadraticCurveTo(320, 282, 640, 268); ctx.stroke(); ctx.setLineDash([]);
+  for (let i = 0; i < 9; i++) { const x = 24 + i * 74, y = 272 + Math.sin((i / 8) * Math.PI) * 5; ctx.fillStyle = "#5a3a20"; ctx.beginPath(); ctx.moveTo(x - 17, y - 5); ctx.lineTo(x + 17, y - 5); ctx.lineTo(x + 11, y + 6); ctx.lineTo(x - 11, y + 6); ctx.closePath(); ctx.fill(); }
+}
+
+Object.assign(BATTLES, {
+  suipacha: {
+    id: "suipacha", order: 1, title: "SUIPACHA", date: "7 de noviembre de 1810",
+    blurb: "La primera gran victoria de la Revolución: una trampa entre los cerros del Alto Perú.",
+    map: SUI_MAP, leaderId: 501, leaderFall: "Balcarce ha caído.", pName: "Ejército de la Junta", pBanner: "FASE DEL EJÉRCITO DE LA JUNTA",
+    units: suiUnits, decor: [], building: "rancho",
+    diff: { easy: { drop: [516, 517, 519, 515], hpM: 0.7, strD: -2, pHp: 10 }, normal: { drop: [517, 516, 519], hpM: 0.8, strD: -1, pHp: 7 }, hard: { drop: [517, 519], hpM: 0.9, strD: 0, pHp: 5 } },
+    startLog: "Los realistas avanzan confiados hacia el río.",
+    introHTML: "<h1>SUIPACHA</h1><h3>7 de noviembre de 1810</h3>" +
+      "<p>La primera expedición de la Junta enfrenta en el Alto Perú a los realistas de José de Córdoba. González Balcarce los engaña haciéndoles creer que su tropa es débil.</p>" +
+      "<p><b>Objetivo:</b> derrota a todos los realistas.<br><b>Derrota:</b> si cae Balcarce (★) o todo tu ejército.</p>" +
+      "<p class='help'><b>Consejos:</b> al principio son más ellos: aguanta de tu lado del río. En el <b>tercer turno</b> salen las tropas <b>emboscadas</b>.</p>",
+    intro: INTRO_SU, epilogue: EPILOGUE_SU, midLines: genericMid("campo", "gba", "¡Ya huyen! ¡Un esfuerzo más!", "cor", "¡No retrocedan! ¡Viva el Rey!"),
+    duel: { a: 501, b: 511, lines: [
+      { bg: "campo", cap: "Balcarce y Córdoba, frente a frente." },
+      { who: "gba", side: "L", mood: "serious", text: "Ríndase, señor. Ha caído en la trampa." },
+      { who: "cor", side: "R", mood: "angry", text: "¡Jamás ante insurgentes!" }
+    ] },
+    turnEvents: { 3: { apply() { spawn(suiReinf()); log("¡Salen las tropas emboscadas!", "#ffd84a"); }, lines: suiLinesReinf } },
+    victoryHTML() { return "<h1>¡VICTORIA!</h1><h3>El primer gran triunfo de la Revolución</h3><p>El 7 de noviembre de 1810, en Suipacha, las fuerzas de la Junta vencieron a los realistas con una retirada fingida y tropas ocultas. Las fuentes no coinciden en las cifras ni en el papel que tuvo Güemes.</p>"; },
+    defeatHTML: "<p>La historia fue distinta: los patriotas vencieron. No cruces el río antes de tiempo y espera a las tropas emboscadas.</p>"
+  },
+  ituzaingo: {
+    id: "ituzaingo", order: 7, title: "ITUZAINGÓ", date: "20 de febrero de 1827",
+    blurb: "La gran batalla de la guerra con el Imperio del Brasil: cargas de caballería en campo abierto.",
+    map: ITU_MAP, leaderId: 601, leaderFall: "Alvear ha caído.", pName: "Ejército Republicano", pBanner: "FASE DEL EJÉRCITO REPUBLICANO",
+    eName: "Imperiales", eBanner: "FASE IMPERIAL", eCries: ["¡Por el Emperador!", "¡Viva Don Pedro!", "¡Por el Brasil!", "¡Firmes!"],
+    units: ituUnits, decor: [], building: "rancho",
+    diff: { easy: { drop: [617, 620, 621, 623, 615, 613], hpM: 0.75, strD: -2, pHp: 8 }, normal: { drop: [617, 620, 621, 623], hpM: 0.85, strD: -1, pHp: 5 }, hard: { drop: [617, 620], hpM: 0.95, strD: 0, pHp: 4 } },
+    startLog: "Los ejércitos se despliegan en los campos de Ituzaingó.",
+    introHTML: "<h1>ITUZAINGÓ</h1><h3>20 de febrero de 1827</h3>" +
+      "<p>En la guerra contra el Imperio del Brasil, el ejército de Alvear enfrenta al del marqués de Barbacena. La caballería de Lavalle, Paz y Brandsen es la gran protagonista.</p>" +
+      "<p><b>Objetivo:</b> derrota a todos los imperiales.<br><b>Derrota:</b> si cae Alvear (★) o todo tu ejército.</p>" +
+      "<p class='help'><b>Consejos:</b> la zanja no se cruza: pasa por el centro o por los extremos. Tus lanceros vencen a los jinetes de sable. En el <b>tercer turno</b> llega la artillería de Iriarte.</p>",
+    intro: INTRO_IT, epilogue: EPILOGUE_IT, midLines: genericMid("campo", "alv", "¡Ya ceden! ¡A la carga!", "bar", "¡Sostengan la línea! ¡Por el Imperio!"),
+    duel: { a: 601, b: 611, lines: [
+      { bg: "campo", cap: "Alvear y Barbacena se encuentran en el campo." },
+      { who: "alv", side: "L", mood: "serious", text: "Su campaña termina aquí, marqués." },
+      { who: "bar", side: "R", mood: "angry", text: "¡Eso lo decidirán las armas!" }
+    ] },
+    turnEvents: { 3: { apply() { spawn(ituReinf()); log("¡Llega la artillería de Iriarte!", "#ffd84a"); }, lines: ituLinesReinf } },
+    victoryHTML() { return "<h1>¡VICTORIA!</h1><h3>Los imperiales se retiran</h3><p>El 20 de febrero de 1827 el ejército republicano venció en Ituzaingó tras unas seis horas de combate. El coronel Brandsen murió en una carga.</p><p>La guerra terminó en 1828 con la independencia de la República Oriental del Uruguay.</p>"; },
+    defeatHTML: "<p>La historia fue distinta: el ejército republicano venció. Usa los lanceros contra sus jinetes y no ataques la zanja de frente.</p>"
+  },
+  obligado: {
+    id: "obligado", order: 8, title: "VUELTA DE OBLIGADO", date: "20 de noviembre de 1845",
+    blurb: "Cadenas y baterías en el Paraná contra la escuadra anglo-francesa. Hay que resistir.",
+    map: OBL_MAP, leaderId: 701, leaderFall: "Mansilla ha caído.", pName: "Defensores", pBanner: "FASE DE LOS DEFENSORES",
+    eName: "Anglo-franceses", eBanner: "FASE DE LA ESCUADRA", eCries: ["¡Fuego!", "¡Adelante!", "¡Abran paso!", "¡En avant!"],
+    survive: SURVIVE, units: oblUnits, decor: [], building: "rancho", overlay: oblOverlay,
+    blocked: (u, x) => u.cls === "ship" && !chainCut() && x <= CHAIN_X,
+    diff: { easy: { drop: [716, 714, 715], hpM: 0.7, strD: -2, pHp: 12 }, normal: { drop: [716, 714], hpM: 0.85, strD: -1, pHp: 8 }, hard: { drop: [716], hpM: 0.85, strD: -1, pHp: 10 } },
+    startLog: "La escuadra remonta el Paraná. ¡A las baterías!",
+    introHTML: "<h1>VUELTA DE OBLIGADO</h1><h3>20 de noviembre de 1845</h3>" +
+      "<p>Mansilla intenta cerrar el Paraná a la escuadra de Inglaterra y Francia con cadenas y baterías en la barranca.</p>" +
+      "<p><b>Objetivo:</b> <b>resiste " + SURVIVE + " turnos</b> (o hunde y derrota a todos).<br><b>Derrota:</b> si cae Mansilla (★) o todos tus hombres.</p>" +
+      "<p class='help'><b>Consejos:</b> las baterías alcanzan 2 a 3 casillas sobre el río. Las cadenas frenan a los buques hasta el <b>cuarto turno</b>; entonces las cortan y desembarcan. Guarda la infantería para ese momento.</p>",
+    intro: INTRO_OB, epilogue: EPILOGUE_OB, midLines: genericMid("rio", "man", "¡Resistan! ¡Cada cañonazo cuenta!", "cap", "¡No se detengan! ¡Fuego!"),
+    duel: null,
+    turnEvents: { 4: { apply() { spawn(oblLanding()); log("¡Cortan las cadenas y desembarcan!", "#ffd84a"); }, lines: oblLinesLanding } },
+    victoryHTML() { return "<h1>¡RESISTENCIA HEROICA!</h1><h3>Día de la Soberanía Nacional</h3><p>En la historia, tras muchas horas de combate y sin municiones, la escuadra logró forzar el paso. Pero la resistencia mostró que remontar los ríos por la fuerza costaba muy caro.</p><p>En los tratados posteriores Inglaterra y Francia reconocieron la soberanía argentina sobre sus ríos.</p>"; },
+    defeatHTML: "<p>Resiste: no acerques a Mansilla a la orilla, deja las baterías disparando y usa la infantería contra el desembarco.</p>"
+  }
+});
+Object.assign(BATTLES.tucuman, { order: 2 });
+BATTLES.sanlorenzo.order = 3; BATTLES.salta.order = 4; BATTLES.chacabuco.order = 5; BATTLES.maipu.order = 6;
+
+// ================= CAPITULOS DE HISTORIA (sin combate) =================
+const STORIES = {
+  mayo: { title: "REVOLUCIÓN DE MAYO", date: "25 de mayo de 1810", place: "Buenos Aires", lines: [
+    { bg: "cabildo", cap: "Mayo de 1810. Llega a Buenos Aires la noticia: las tropas de Napoleón dominan España y la Junta de Sevilla ha caído." },
+    { who: "cas", side: "L", mood: "serious", text: "Si ya no hay gobierno en España que lo haya nombrado, ¿en nombre de quién manda el virrey?" },
+    { who: "cis", side: "R", mood: "angry",   text: "¡Mando en nombre del rey Fernando! Esto es una insolencia." },
+    { cap: "El 22 de mayo un Cabildo abierto discute quién debe gobernar. La mayoría vota que el virrey cese en el mando." },
+    { who: "saa", side: "L", mood: "serious", text: "Señor virrey, los Patricios no sostendrán su gobierno. El pueblo quiere decidir." },
+    { who: "mor", side: "R", mood: "serious", text: "Los pueblos tienen derecho a darse su propio gobierno." },
+    { who: "bel", side: "L", mood: "smile",   text: "{N}, mire la Plaza: los vecinos esperan una respuesta. Hoy empieza algo nuevo." },
+    { cap: "25 de mayo de 1810: se forma la Primera Junta, presidida por Saavedra, con Moreno y Paso como secretarios y Belgrano y Castelli entre los vocales." },
+    { cap: "No hubo batalla ese día. Pero para defender la Revolución habrá que pelear..." }
+  ] },
+  independencia: { title: "LA INDEPENDENCIA", date: "9 de julio de 1816", place: "San Miguel de Tucumán", lines: [
+    { bg: "congreso", cap: "1816. Fernando VII ha vuelto al trono y quiere recuperar América. En Tucumán se reúne un Congreso de las provincias." },
+    { who: "sm",  side: "L", mood: "serious", text: "Desde Mendoza insisto: ¿hasta cuándo esperaremos para declarar nuestra independencia?" },
+    { who: "bel", side: "R", mood: "serious", text: "El mundo debe saber que ya no somos una colonia que protesta, sino una nación." },
+    { who: "oro", side: "L", mood: "serious", text: "Los diputados representamos a los pueblos. Decidamos con prudencia, pero decidamos." },
+    { who: "lap", side: "R", mood: "serious", text: "Señores diputados: ¿quieren que las Provincias de la Unión sean una nación libre e independiente de los reyes de España?" },
+    { cap: "La respuesta fue unánime. El 9 de julio de 1816 se declaró la Independencia en la casa de doña Francisca Bazán de Laguna." },
+    { who: "bel", side: "L", mood: "smile",   text: "Ya somos libres en el papel, {N}. Ahora hay que asegurarlo en el campo." }
+  ] },
+  andes: { title: "EL CRUCE DE LOS ANDES", date: "Enero de 1817", place: "De Mendoza a Chile", lines: [
+    { bg: "andes", cap: "Desde Mendoza, San Martín ha preparado en silencio un ejército para liberar Chile y luego atacar el Perú." },
+    { who: "sm",  side: "L", mood: "serious", text: "Cruzaremos por varios pasos a la vez. El enemigo no sabrá por dónde llegamos." },
+    { who: "ohi", side: "R", mood: "serious", text: "El frío y la altura serán tan peligrosos como los realistas, general." },
+    { who: "sm",  side: "L", mood: "smile",   text: "Lo que no me deja dormir no es la fuerza del enemigo, sino atravesar estos inmensos montes. ¡Adelante!" },
+    { cap: "Hombres, mulas y cañones atravesaron la cordillera. En febrero bajaron a Chile." }
+  ] },
+  cancha: { title: "CANCHA RAYADA", date: "19 de marzo de 1818", place: "Cerca de Talca, Chile", lines: [
+    { bg: "noche", cap: "Una noche de marzo, el ejército patriota está cambiando de posición cuando los realistas atacan por sorpresa." },
+    { who: "ohi", side: "R", mood: "sad",     text: "¡Estoy herido en el brazo! ¡No pierdan la calma!" },
+    { who: "lhe", side: "L", mood: "serious", text: "Mi división sigue entera. Me retiro en orden y salvo lo que pueda." },
+    { who: "sm",  side: "R", mood: "serious", text: "Hemos perdido una noche, no la guerra. Reunamos a los hombres cerca de Santiago." },
+    { cap: "El ejército se rehízo en pocos días. El 5 de abril se jugaría todo en Maipú." }
+  ] }
+};
+const seenStories = () => Save.get("seen", []);
+function storiesBefore(id) {                                       // capitulos que preceden a esta batalla en la cronologia
+  const out = []; let i = CHRONO.findIndex(it => it.battle === id);
+  for (i--; i >= 0 && !CHRONO[i].battle; i--) if (CHRONO[i].story) out.unshift(CHRONO[i].story);
+  return out;
+}
+function playStory(key, done) {
+  const s = STORIES[key];
+  $overlay.classList.add("hidden");
+  const seen = seenStories(); if (!seen.includes(key)) { seen.push(key); Save.set("seen", seen); }
+  startDialogue([{ bg: s.lines[0].bg, cap: "— " + s.title + " —  " + s.date + ", " + s.place + "." }].concat(s.lines), done);
+  dlg.date = s.date;
+}
+function playStories(keys, done) { if (!keys.length) { done(); return; } playStory(keys[0], () => playStories(keys.slice(1), done)); }
+
+function drawCabildo(t) {                                          // la Plaza y el Cabildo, dia nublado
+  drawDayField(t);
+  ctx.fillStyle = "rgba(90,100,120,.45)"; ctx.fillRect(0, 0, 640, 300);
+  ctx.fillStyle = "#8a8272"; ctx.fillRect(0, 268, 640, 172);
+  ctx.fillStyle = "#efe9da"; ctx.strokeStyle = "#5a5040"; ctx.lineWidth = 2;
+  ctx.fillRect(110, 150, 420, 124); ctx.strokeRect(110, 150, 420, 124);
+  ctx.fillRect(284, 66, 72, 86); ctx.strokeRect(284, 66, 72, 86);
+  ctx.fillStyle = "#a8482e"; ctx.beginPath(); ctx.moveTo(276, 68); ctx.lineTo(320, 34); ctx.lineTo(364, 68); ctx.closePath(); ctx.fill();
+  ctx.fillRect(102, 142, 182, 10); ctx.fillRect(356, 142, 182, 10);
+  ctx.fillStyle = "#4a3a2c"; for (let i = 0; i < 7; i++) for (const y of [166, 220]) { const x = 126 + i * 58, h = y === 166 ? 34 : 54; ctx.beginPath(); ctx.moveTo(x, y + h); ctx.lineTo(x, y + 12); ctx.arc(x + 15, y + 12, 15, Math.PI, 0); ctx.lineTo(x + 30, y + h); ctx.closePath(); ctx.fill(); }
+  ctx.beginPath(); ctx.arc(320, 106, 12, 0, 7); ctx.fillStyle = "#fff"; ctx.fill(); ctx.stroke();
+  for (let i = 0; i < 38; i++) miniSoldier(30 + (i * 83) % 590, 282 + (i % 3) * 8, ["#23232b", "#4a3a2c", "#274f95", "#5a2a24"][i % 4], 0.9, i % 2 ? 1 : -1, t, i);
+}
+function drawCongreso(t) {                                         // la casa de Tucuman
+  drawDayField(t);
+  ctx.fillStyle = "#a89878"; ctx.fillRect(0, 270, 640, 170);
+  ctx.fillStyle = "#f6f1e2"; ctx.strokeStyle = "#7a6a50"; ctx.lineWidth = 2; ctx.fillRect(150, 138, 340, 138); ctx.strokeRect(150, 138, 340, 138);
+  ctx.fillStyle = "#a8482e"; ctx.fillRect(140, 124, 360, 16);
+  ctx.fillStyle = "#3a5a3a"; ctx.fillRect(292, 190, 56, 86);
+  for (const x of [266, 358]) { ctx.fillStyle = "#e6dcc0"; ctx.fillRect(x, 150, 16, 126); ctx.strokeRect(x, 150, 16, 126); ctx.strokeStyle = "#c8bc9c"; ctx.beginPath(); for (let y = 156; y < 272; y += 10) { ctx.moveTo(x, y); ctx.lineTo(x + 16, y + 8); } ctx.stroke(); ctx.strokeStyle = "#7a6a50"; }
+  for (const x of [178, 224, 396, 442]) { ctx.fillStyle = "#3a3026"; ctx.fillRect(x, 190, 28, 52); ctx.strokeStyle = "#111"; ctx.beginPath(); for (let i = 7; i < 28; i += 7) { ctx.moveTo(x + i, 190); ctx.lineTo(x + i, 242); } ctx.stroke(); }
+  drawFlag(96, 280, t, 1.3); drawFlag(540, 280, t, 1.3);
+}
+function drawNoche(t) {                                            // sorpresa nocturna
+  drawDayField(t);
+  ctx.fillStyle = "rgba(6,10,40,.72)"; ctx.fillRect(0, 0, 640, 440);
+  for (const [x, y] of [[90, 262], [250, 284], [430, 258], [560, 280]]) glowDot(ctx, x, y, 26 + Math.sin(t / 90 + x) * 6, "255,150,60", "0.85");
+  drawSmoke(t, [[90, 258, 5], [430, 254, 5]], "150,140,150");
+}
+
 let B = BATTLES.sanlorenzo;
 function setBattle(id) {
   B = BATTLES[id]; MAP = B.map; units = makeUnits(); faceShown = null; locustActive = false;
@@ -3149,7 +3706,7 @@ const Save = {                                                     // progreso g
 };
 // ================= NOMBRE DEL JUGADOR Y CONSEJOS DE BATALLA (estilo Fire Emblem) =================
 let playerName = "Soldado";
-const ADVISER = { sm: "San Martín", bel: "Belgrano" };
+const ADVISER = { sm: "San Martín", bel: "Belgrano", gba: "Balcarce", alv: "Alvear", man: "Mansilla" };
 const lineText = ln => (ln.text || ln.cap || "").replace(/\{N\}/g, playerName);
 function askName(done, cancelable) {
   $box.classList.remove("wide");
@@ -3316,29 +3873,63 @@ BATTLES.maipu.advice = [
   { who: "sm", mood: "smile", text: "A mí no me exponga: si caigo, Chile cae. Osorio queda para el final. ¡Que la Patria nos ayude, {N}! Toque «Consejo» (tecla C) para que se lo repita.", hl: [U([1], "green", "No exponer"), U([321], "red", "Jefe: al final")] }
 ];
 
+BATTLES.salta.advice = [
+  { who: "bel", mood: "serious", early: true, text: "Ayudante {N}, los sorprendimos: Tristán nos esperaba por el sur y aparecimos por el norte. En este mapa avanzamos desde la izquierda hacia la ciudad.", hl: [Z([9, 1, 4, 8], "red", "Ejército de Tristán")] },
+  { who: "bel", mood: "serious", text: "Los zanjones tienen agua y no se cruzan. Quedan tres pasos: norte, centro y sur. Avancemos juntos, no cada uno por su lado.", hl: [A([4, 2], [9, 2], "gold", "Paso norte"), A([4, 5], [9, 5], "gold", "Centro"), A([4, 8], [9, 8], "gold", "Paso sur")] },
+  { who: "bel", mood: "smile", text: "Saravia y el gaucho llevan boleadoras: frenen a los dragones enemigos y después los rematamos.", hl: [U([402, 104], "blue", "Boleadoras"), U([420, 421], "red", "Dragones")] },
+  { who: "bel", mood: "sad", text: "Díaz Vélez está herido. Es bravo, pero no lo ponga delante.", hl: [U([102], "green", "Herido")] },
+  { who: "bel", mood: "angry", text: "Sus cañones pegan de 2 a 3 casillas y de cerca no se defienden: caiga sobre ellos con la caballería.", hl: [U([422, 423], "red", "Cañones")] },
+  { who: "bel", mood: "smile", text: "En el tercer turno entra la reserva con Dorrego. No se apure antes de eso.", hl: [Z([0, 4, 2, 3], "green", "Reserva (turno 3)")] },
+  { who: "bel", mood: "serious", text: "A mí protéjame: si caigo, perdemos. Tristán queda para el final. ¡Adelante, {N}! Con «Consejo» (tecla C) se lo repito.", hl: [U([101], "green", "No exponer"), U([111], "red", "Jefe: al final")] }
+];
+
+BATTLES.suipacha.advice = [
+  { who: "gba", mood: "serious", text: "Ayudante {N}, que nos crean débiles. Aguantemos de este lado del río y dejemos que crucen.", hl: [Z([2, 3, 5, 5], "blue", "Aguanten aquí"), Z([10, 3, 4, 5], "red", "Realistas")] },
+  { who: "gba", mood: "smile", text: "En el tercer turno saldrán nuestros hombres ocultos, por el norte y por el sur. Ahí contraatacamos.", hl: [Z([5, 1, 2, 2], "green", "Emboscada"), Z([5, 8, 2, 2], "green", "Emboscada")] },
+  { who: "gba", mood: "serious", text: "Primero sus cañones, y a mí no me exponga. ¡Adelante, {N}!", hl: [U([518, 519], "red", "Cañones"), U([501], "green", "No exponer")] }
+];
+BATTLES.ituzaingo.advice = [
+  { who: "alv", mood: "serious", text: "{N}, la zanja protege su centro. Pasemos por el medio y por los extremos, sin amontonarnos.", hl: [A([4, 1], [9, 1], "gold", "Norte"), A([4, 5], [9, 5], "gold", "Centro"), A([4, 9], [9, 9], "gold", "Sur")] },
+  { who: "alv", mood: "smile", text: "Sus jinetes llevan sable: mande contra ellos a Lavalle y los lanceros.", hl: [U([602, 605, 606], "blue", "Lanzas"), U([618, 619, 620, 621], "red", "Jinetes")] },
+  { who: "alv", mood: "serious", text: "En el tercer turno llega Iriarte con los cañones. Y a mí protéjame. ¡Adelante!", hl: [Z([0, 4, 1, 3], "green", "Artillería (turno 3)"), U([601], "green", "No exponer")] }
+];
+BATTLES.obligado.advice = [
+  { who: "man", mood: "serious", text: "{N}, no hace falta vencer: hay que resistir ocho turnos. Cada turno que aguantemos cuenta.", hl: [U([702, 703, 704, 705], "blue", "Baterías"), Z([11, 0, 5, 4], "red", "Escuadra")] },
+  { who: "man", mood: "serious", text: "Las cadenas los detienen hasta el cuarto turno. Que las baterías disparen cuando se acerquen.", hl: [Z([5, 0, 1, 4], "gold", "Cadenas")] },
+  { who: "man", mood: "angry", text: "En el cuarto turno desembarcan por el este. La infantería y los gauchos deben cortarles el paso a las baterías.", hl: [Z([13, 4, 3, 2], "red", "Desembarco (turno 4)"), U([706, 707, 708, 709, 710], "blue", "Defensa")] },
+  { who: "man", mood: "smile", text: "Y yo me quedo atrás: si caigo, se acaba la resistencia. ¡Viva la Patria!", hl: [U([701], "green", "No exponer")] }
+];
+
 const BATTLE_GEO = {
+  suipacha:   { place: "A orillas del río Suipacha, Alto Perú", region: "departamento de Potosí", country: "Bolivia", lon: -65.6, lat: -21.55, then: "En 1810 el Alto Perú formaba parte del Virreinato del Río de la Plata y estaba en manos realistas." },
+  ituzaingo:  { place: "Campos de Ituzaingó (Paso del Rosario)", region: "Rio Grande do Sul", country: "Brasil", lon: -54.9, lat: -30.25, then: "En 1827 la República Argentina y el Imperio del Brasil disputaban la Banda Oriental." },
+  obligado:   { place: "Vuelta de Obligado, sobre el río Paraná", region: "provincia de Buenos Aires", country: "Argentina", lon: -59.81, lat: -33.58, then: "En 1845 Inglaterra y Francia quisieron navegar los ríos interiores sin permiso de la Confederación." },
+  salta:      { place: "Campo de Castañares, al norte de la ciudad de Salta", region: "provincia de Salta", country: "Argentina", lon: -65.41, lat: -24.74, then: "En 1813 Salta estaba en manos de los realistas de Pío Tristán, derrotados meses antes en Tucumán." },
   tucuman:    { place: "Campo de las Carreras, San Miguel de Tucumán", region: "provincia de Tucumán", country: "Argentina", lon: -65.22, lat: -26.83, then: "En 1812, el norte del actual territorio argentino era la frontera con el Virreinato del Perú, en manos realistas." },
   sanlorenzo: { place: "Convento de San Carlos, San Lorenzo", region: "provincia de Santa Fe", country: "Argentina", lon: -60.74, lat: -32.75, then: "En 1813, a orillas del río Paraná, los realistas de Montevideo hostigaban los pueblos de la costa." },
   chacabuco:  { place: "Cuesta de Chacabuco, al norte de Santiago", region: "Región Metropolitana", country: "Chile", lon: -70.72, lat: -32.98, then: "En 1817 Chile estaba otra vez en poder de los realistas. El Ejército de los Andes cruzó la cordillera desde Mendoza." },
   maipu:      { place: "Llanos de Maipú, cerca de Santiago", region: "Región Metropolitana", country: "Chile", lon: -70.77, lat: -33.51, then: "En 1818, a pocos kilómetros de Santiago, se decidió la independencia de Chile." }
 };
 const CHRONO = [
-  { date: "25 de mayo de 1810", title: "Revolución de Mayo", text: "Buenos Aires forma el primer gobierno patrio." },
+  { story: "mayo" },
+  { battle: "suipacha" },
   { battle: "tucuman" },
   { battle: "sanlorenzo" },
-  { date: "20 de febrero de 1813", title: "Batalla de Salta", text: "Belgrano derrota al ejército realista de Pío Tristán." },
-  { date: "9 de julio de 1816", title: "Declaración de la Independencia", text: "El Congreso reunido en San Miguel de Tucumán declara la independencia." },
-  { date: "Enero de 1817", title: "Cruce de los Andes", text: "San Martín lleva el Ejército de los Andes de Mendoza a Chile." },
+  { battle: "salta" },
+  { story: "independencia" },
+  { story: "andes" },
   { battle: "chacabuco" },
-  { date: "19 de marzo de 1818", title: "Cancha Rayada", text: "Los realistas sorprenden de noche al ejército patriota y lo dispersan." },
-  { battle: "maipu" }
+  { story: "cancha" },
+  { battle: "maipu" },
+  { battle: "ituzaingo" },
+  { battle: "obligado" }
 ];
 let gameMode = Save.get("mode", "free"), menuSel = null, mapPins = [], mapHover = null;
 const battlesSorted = () => Object.values(BATTLES).sort((a, b) => a.order - b.order);
 const doneIds = () => Save.get("done", []);
 function markDone(id) { const d = doneIds(); if (!d.includes(id)) { d.push(id); Save.set("done", d); } }
 function nextBattle(id) { const l = battlesSorted(), i = l.findIndex(b => b.id === id); return l[i + 1] || null; }
-function isUnlocked(b) { if (gameMode !== "campaign") return true; const l = battlesSorted(), i = l.indexOf(b); return i <= 0 || doneIds().includes(l[i - 1].id); }
+function isUnlocked(b) { if (gameMode !== "campaign") return true; const l = battlesSorted(), i = l.indexOf(b); return i <= 0 || doneIds().includes(l[i - 1].id) || doneIds().includes(b.id); }
 
 // ---- mapa esquematico del Cono Sur (lon, lat) ----
 const GEO_VIEW = { lon0: -77, lon1: -52, lat0: -19, lat1: -46 };
@@ -3351,8 +3942,9 @@ const G_PAR = [[-62.65, -22.25], [-62.3, -20.5], [-61, -19.7], [-58.1, -19.9], [
 const G_BRA = [[-57.5, -16], [-46, -16], [-46, -26], [-48.4, -28], [-50.5, -31], [-53.37, -33.7], [-53.4, -32.6], [-55, -31], [-56, -30.2], [-57.6, -30.2], [-56.9, -29.4], [-55.8, -28.2], [-54.6, -27.5], [-53.7, -27.2], [-53.65, -26.25], [-54, -25.7], [-54.6, -25.6], [-54.45, -25.5], [-54.7, -23.9], [-55.9, -22.3], [-57.8, -22], [-58.1, -19.9]];
 const G_URU = [[-57.6, -30.2], [-56, -30.2], [-55, -31], [-53.4, -32.6], [-53.37, -33.7], [-53.9, -34.5], [-54.9, -34.95], [-56, -34.9], [-57.2, -34.45], [-58.4, -33.9], [-58.2, -32.8], [-58.1, -31.5]];
 const G_CITIES = [["Buenos Aires", -58.4, -34.6, 8, 3], ["Córdoba", -64.18, -31.42, 6, 10], ["Mendoza", -68.84, -32.89, 6, 11]];
-const BADGE = { tucuman: [26, -14], sanlorenzo: [26, -12], chacabuco: [-34, -18], maipu: [-34, 16] };
+const BADGE = { suipacha: [28, -6], ituzaingo: [8, -30], obligado: [-30, 26], salta: [-32, -8], tucuman: [26, -14], sanlorenzo: [26, -12], chacabuco: [-34, -18], maipu: [-34, 16] };
 
+const titleCase = t => t.toLowerCase().split(" ").map(w => w === "de" ? w : w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
 function drawMapCanvas(cvs, selId, hovId) {
   const g = cvs.getContext("2d"), W2 = cvs.width, H2 = cvs.height, V = GEO_VIEW, list = battlesSorted(), done = new Set(doneIds());
   const P = (lon, lat) => [(lon - V.lon0) / (V.lon1 - V.lon0) * W2, (V.lat0 - lat) / (V.lat0 - V.lat1) * H2];
@@ -3396,9 +3988,9 @@ function drawMapCanvas(cvs, selId, hovId) {
     if (sel) { g.fillStyle = "rgba(255,226,120,.35)"; g.beginPath(); g.arc(bx, by, r + 6, 0, 7); g.fill(); }
     g.fillStyle = lock ? "#8a8a90" : done.has(b.id) ? "#3f9a4a" : sel ? "#e8b020" : "#2c58b8"; g.strokeStyle = sel ? "#fff3c8" : "#fff"; g.lineWidth = sel ? 2.6 : 2; g.beginPath(); g.arc(bx, by, r, 0, 7); g.fill(); g.stroke();
     g.fillStyle = sel ? "#2a1a08" : "#fff"; g.font = "bold " + (sel ? 14 : 12) + "px Georgia"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(String(i + 1), bx, by + 0.5); g.textBaseline = "alphabetic";
-    g.font = "bold 11px Georgia"; const tw = g.measureText(b.title.charAt(0) + b.title.slice(1).toLowerCase()).width + 10, ty = oy < 0 ? by - r - 7 : by + r + 14;
+    g.font = "bold 11px Georgia"; const tw = g.measureText(titleCase(b.title)).width + 10, ty = oy < 0 ? by - r - 7 : by + r + 14;
     g.fillStyle = "rgba(255,250,232,.92)"; g.strokeStyle = "rgba(60,40,20,.7)"; g.lineWidth = 1; rrect(g, bx - tw / 2, ty - 11, tw, 15, 4); g.fill(); g.stroke();
-    g.fillStyle = "#2a1a08"; g.fillText(b.title.charAt(0) + b.title.slice(1).toLowerCase(), bx, ty);
+    g.fillStyle = "#2a1a08"; g.fillText(titleCase(b.title), bx, ty);
     mapPins.push({ id: b.id, x: bx, y: by, r: r + 3 });
   });
   const [nx, ny] = [W2 - 28, 30];                                                           // rosa de los vientos
@@ -3421,7 +4013,8 @@ function showMenu() {
       const b = BATTLES[it.battle], g = BATTLE_GEO[b.id], un = isUnlocked(b), n = list.indexOf(b) + 1;
       return "<div class='ti bt" + (b.id === menuSel ? " sel" : "") + (un ? "" : " lock") + "' data-b='" + b.id + "'><div class='tdate'>" + b.date + (camp && done.has(b.id) ? " · ✔ ganada" : "") + (un ? "" : " · 🔒 bloqueada") + "</div><div class='ttitle'><span class='num'>" + n + "</span>" + b.title + "</div><div class='tplace'>" + g.place + " · " + g.country + "</div></div>";
     }
-    return "<div class='ti hito'><div class='tdate'>" + it.date + "</div><div class='ttitle'>" + it.title + "</div><div class='tplace'>" + it.text + "</div></div>";
+    const st = STORIES[it.story];
+    return "<div class='ti bt story' data-st='" + it.story + "'><div class='tdate'>" + st.date + (seenStories().includes(it.story) ? " · ✔ vista" : "") + "</div><div class='ttitle'>📜 " + st.title + "</div><div class='tplace'>Historia, sin combate · tocá para verla</div></div>";
   }).join("");
   const sb = BATTLES[menuSel], sg = BATTLE_GEO[sb.id], un = isUnlocked(sb);
   $box.classList.add("wide");
@@ -3429,16 +4022,17 @@ function showMenu() {
     "<h1>BATALLAS ARGENTINAS</h1><h3>Táctica por turnos al estilo Fire Emblem<br><span style='font-size:13px'>Comandante <b style='color:#ffe9a8'>" + playerName + "</b> · <a href='#' id='chname' style='color:#ffe08a'>cambiar nombre</a></span></h3>" +
     "<div class='modes'><button class='mbtn" + (camp ? " sel" : "") + "' data-m='campaign'>Campaña cronológica</button><button class='mbtn" + (camp ? "" : " sel") + "' data-m='free'>Batalla libre</button></div>" +
     "<p class='help' style='text-align:center;margin:4px 0 8px'>" + (camp ? "Cada batalla se desbloquea al ganar la anterior, en orden cronológico." : "Elegí cualquier batalla, en el orden que quieras.") + "</p>" +
+    "<div class='playbar'>" + "<button id='playsel'" + (un ? "" : " disabled") + ">" + (un ? "Jugar: " + sb.title : "Bloqueada: ganá la batalla anterior") + "</button>" + "</div>" +
     "<div class='menu2'><div class='tl'>" + tl + "</div><div class='mapcol'><canvas id='mapc' width='380' height='490'></canvas><div class='mapnote'>Mapa esquemático · tocá un número para elegir la batalla</div></div></div>" +
     "<div class='minfo'><b>" + sb.title + "</b> · " + sb.date + "<br><span class='where'>📍 " + sg.place + " (" + sg.region + ") · <b>" + sg.country + "</b></span><br><span>" + sg.then + "</span><br><span class='blurb'>" + sb.blurb + "</span></div>" +
-    "<button id='playsel'" + (un ? "" : " disabled") + ">" + (un ? "Jugar: " + sb.title : "Bloqueada: ganá la batalla anterior") + "</button>" +
     "<div class='row2'><button id='loadgame'>Cargar partida</button><button id='howto'>¿Cómo se juega? (instructivo)</button>" + (camp ? "<button id='resetc'>" + (resetArmed ? "¿Seguro? Tocá de nuevo para borrar el avance" : "Reiniciar campaña") + "</button>" : "") + "</div>" +
     "<p class='help' style='text-align:center'>Música: la Marcha de San Lorenzo suena en esa batalla; en las demás, música sintetizada.</p>";
   $overlay.classList.remove("hidden");
   const t2 = $box.querySelector(".tl"); t2.scrollTop = keep;
   const cvs = document.getElementById("mapc"); drawMapCanvas(cvs, menuSel, null);
   $box.querySelectorAll(".mbtn").forEach(btn => btn.onclick = () => { gameMode = btn.dataset.m; Save.set("mode", gameMode); resetArmed = 0; showMenu(); });
-  $box.querySelectorAll(".ti.bt").forEach(el => el.onclick = () => { const b = BATTLES[el.dataset.b]; if (!isUnlocked(b)) return; menuSel = b.id; showMenu(); });
+  $box.querySelectorAll(".ti.story").forEach(el => el.onclick = () => playStory(el.dataset.st, showMenu));
+  $box.querySelectorAll(".ti.bt:not(.story)").forEach(el => el.onclick = () => { const b = BATTLES[el.dataset.b]; if (!isUnlocked(b)) return; menuSel = b.id; showMenu(); });
   cvs.onmousemove = ev => { const p = pinAt(cvs, ev), id = p ? p.id : null; cvs.style.cursor = p ? "pointer" : "default"; if (id !== mapHover) { mapHover = id; drawMapCanvas(cvs, menuSel, id); } };
   cvs.onclick = ev => { const p = pinAt(cvs, ev); if (p && isUnlocked(BATTLES[p.id])) { menuSel = p.id; showMenu(); } };
   document.getElementById("playsel").onclick = () => { if (!isUnlocked(BATTLES[menuSel])) return; setBattle(menuSel); showBattleIntro(); };
@@ -3446,7 +4040,7 @@ function showMenu() {
   document.getElementById("chname").onclick = e => { e.preventDefault(); askName(showMenu, true); };
   document.getElementById("loadgame").onclick = () => showSaves(true);
   const rc = document.getElementById("resetc");
-  if (rc) rc.onclick = () => { if (!resetArmed) { resetArmed = 1; showMenu(); } else { Save.set("done", []); resetArmed = 0; menuSel = null; showMenu(); } };
+  if (rc) rc.onclick = () => { if (!resetArmed) { resetArmed = 1; showMenu(); } else { Save.set("done", []); Save.set("seen", []); resetArmed = 0; menuSel = null; showMenu(); } };
 }
 // ================= GUARDAR Y CARGAR PARTIDAS =================
 function snapshot() {                                              // foto del estado de la batalla (solo en tu turno)
@@ -3466,7 +4060,7 @@ function loadSnapshot(s) {
   (s.log || []).forEach(([t, c]) => log(t, c || undefined)); log("-- Partida cargada --");
   for (const k in evFlags) evFlags[k] = false; Object.assign(evFlags, s.evFlags || {});
   locustActive = !!s.locust; faceShown = null; scene = null; options = []; selW = null; selected = null; moveMap = null; targets = null; dlg = null; banner = null;
-  state = "select"; busy = false; $end.disabled = false; $turn.textContent = "Turno " + turn + " - " + B.pName;
+  state = "select"; busy = false; $end.disabled = false; $turn.textContent = turnLabel(B.pName);
   $overlay.classList.add("hidden"); updateInfo();
   return true;
 }
@@ -3476,7 +4070,7 @@ function showSaves(fromMenu) {
   const canSave = !fromMenu && state === "select" && !busy && !scene && !dlg;
   const slots = ["1", "2", "3", "auto"];
   const info = s => { const b = BATTLES[s.battle], alivePl = s.units.filter(u => u.team === "p" && u.hp > 0).length, alive = s.units.filter(u => u.team === "e" && u.hp > 0).length;
-    return "<b>" + b.title + "</b> · " + b.date + "<br>Turno " + s.turn + " · " + alivePl + " tuyos y " + alive + " realistas en pie · " + (s.mode === "campaign" ? "Campaña" : "Batalla libre") + "<br><span class='help'>Guardada: " + new Date(s.t).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) + "</span>"; };
+    return "<b>" + b.title + "</b> · " + b.date + "<br>Turno " + s.turn + " · " + alivePl + " tuyos y " + alive + " enemigos en pie · " + (s.mode === "campaign" ? "Campaña" : "Batalla libre") + "<br><span class='help'>Guardada: " + new Date(s.t).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) + "</span>"; };
   $box.innerHTML = "<h1>PARTIDAS</h1><h3>" + (fromMenu ? "Cargá una partida guardada" : canSave ? "Guardá o cargá una partida" : "Solo se puede guardar en tu turno, antes de mover") + "</h3>" +
     slots.map(k => { const s = Save.get("save_" + k, null), name = k === "auto" ? "Autoguardado (inicio de tu último turno)" : "Ranura " + k;
       return "<div class='slot'><div class='sname'>" + name + "</div><div class='sinfo'>" + (s ? info(s) : "<i>vacía</i>") + "</div><div class='sbtns'>" +
@@ -3494,14 +4088,14 @@ function showSaves(fromMenu) {
 }
 function showBattleIntro() {
   $box.classList.remove("wide");
-  $box.innerHTML = B.introHTML +
+  $box.innerHTML = "<div class='playbar'><button id='go'>Comenzar la batalla</button></div>" + B.introHTML +
     "<p class='help'>Combate como en Fire Emblem: armas con poder, punteria y critico; ataque doble por velocidad; triangulo de armas. El instructivo explica todo.</p>" +
     diffUI() +
-    "<button id='howto'>¿Cómo se juega? (instructivo)</button><button id='go'>Comenzar la batalla</button><button id='back'>Cronología y mapa</button>";
+    "<button id='howto'>¿Cómo se juega? (instructivo)</button><button id='back'>Cronología y mapa</button>";
   $overlay.classList.remove("hidden"); bindDiff();
   document.getElementById("howto").onclick = openHelp;
   document.getElementById("back").onclick = () => { menuSel = B.id; showMenu(); };
-  document.getElementById("go").onclick = () => { setBattle(B.id); $overlay.classList.add("hidden"); startDialogue(B.intro, newGame); };
+  document.getElementById("go").onclick = () => { setBattle(B.id); $overlay.classList.add("hidden"); playStories(storiesBefore(B.id).filter(k => !seenStories().includes(k)), () => startDialogue(B.intro, newGame)); };
 }
 function showEnd(win, why) {
   state = "over"; busy = true; $end.disabled = true;

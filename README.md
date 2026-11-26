@@ -7,10 +7,16 @@ Se juega en el navegador: no hace falta instalar nada. El juego es el archivo `i
 
 | # | Batalla | Fecha | Lugar |
 |---|---|---|---|
-| 1 | Tucumán | 24 de septiembre de 1812 | Campo de las Carreras, Tucumán (Argentina) |
-| 2 | San Lorenzo | 3 de febrero de 1813 | Convento de San Carlos, San Lorenzo, Santa Fe (Argentina) |
-| 3 | Chacabuco | 12 de febrero de 1817 | Cuesta de Chacabuco, al norte de Santiago (Chile) |
-| 4 | Maipú | 5 de abril de 1818 | Llanos de Maipú, cerca de Santiago (Chile) |
+| 1 | Suipacha | 7 de noviembre de 1810 | Río Suipacha, Alto Perú (Bolivia) |
+| 2 | Tucumán | 24 de septiembre de 1812 | Campo de las Carreras, Tucumán (Argentina) |
+| 3 | San Lorenzo | 3 de febrero de 1813 | Convento de San Carlos, Santa Fe (Argentina) |
+| 4 | Salta | 20 de febrero de 1813 | Campo de Castañares, Salta (Argentina) |
+| 5 | Chacabuco | 12 de febrero de 1817 | Cuesta de Chacabuco (Chile) |
+| 6 | Maipú | 5 de abril de 1818 | Llanos de Maipú (Chile) |
+| 7 | Ituzaingó | 20 de febrero de 1827 | Paso del Rosario (Brasil) |
+| 8 | Vuelta de Obligado | 20 de noviembre de 1845 | Río Paraná, Buenos Aires (Argentina) |
+
+Capítulos de historia, sin combate: Revolución de Mayo (1810), Independencia (1816), Cruce de los Andes (1817) y Cancha Rayada (1818). En campaña se muestran antes de la batalla que les sigue y se pueden volver a ver desde la cronología.
 
 ## Cómo jugar
 
